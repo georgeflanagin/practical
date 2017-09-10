@@ -20,7 +20,10 @@
 
 
 from   functools import total_ordering
+import hashlib
 import os
+import typing
+from   typing import *
 from   urllib.parse import urlparse
 
 # Credits
@@ -32,12 +35,17 @@ __maintainer__ = 'George Flanagin'
 __email__ = 'gflanagin@richmond.edu'
 __status__ = 'Prototype'
 
+"""
+This is Guido's hack to allow forward references for types not yet
+defined.
+"""
 class Fname:
     pass
 
 @total_ordering
 class Fname:
-    """ Simple class to make filename manipulation more readable.
+    """ 
+    Simple class to make filename manipulation more readable.
 
     Example:
 
@@ -55,20 +63,39 @@ class Fname:
     """
 
     def __init__(self, s:str):
-        """ Create an Fname from a string that is a file name or a well
+        """ 
+        Create an Fname from a string that is a file name or a well
         behaved URI. An Fname consists of several strings, each of which
-        corresponds to one of the commonsense parts of the file name."""
+        corresponds to one of the commonsense parts of the file name.
+
+        Members:
+            _me -- whatever you used to create the object.
+            _is_URI -- boolean
+            _fqn -- calculated full name
+            _dir -- just the directory part of the name
+            _fname -- the file and the extension
+            _fname_only -- no dir and no extension
+            _ext -- just the extension (if it has one)
+            _all_but_ext -- the complement of _ext
+            _content_hash -- hexdigit string representing the contents
+                the last time the file was read.
+
+        Raises a ValueError if the argument is empty.
+
+        """
+
+        if not s or not isinstance(s, str): 
+            raise ValueError('Cannot create empty Fname object.')
 
         self._me = s
         self._is_URI = False
         self._fqn = ""
-        self.__dir = ""
+        self._dir = ""
         self._fname = ""
         self._fname_only = ""
         self._ext = ""
         self._all_but_ext = ""
-
-        if not s or not isinstance(s, str) or not len(s): return
+        self._content_hash = ""
 
         self._is_URI = True if "://" in s else False
         if self._is_URI and 'file://' in s:
@@ -94,15 +121,24 @@ class Fname:
         return os.path.isfile(self._fqn)
 
 
-    def __call__(self, sep:str=None) -> object:
+    def __call__(self, sep:str=None) -> Union[str, List[str]]:
         """
         Return the contents of the file as an str object.
+
+        Note: Invoking this function will also calculate the MD5 sum of the
+        contents of the file. It's a cheap operation, and as long as we are
+        reading the file, we might as well.
         """
 
         if not self: return None
+
         with open(str(self)) as f:
-            if sep is None: return f.read()
-            else: return f.read().split(sep)
+            if sep is None: r_val = f.read()
+            else: r_val = f.read().split(sep)
+        print(type(r_val))
+        self._content_hash = hashlib.md5(r_val.encode('utf-8')).hexdigest()
+
+        return r_val
 
 
     def __len__(self) -> int:
@@ -150,27 +186,38 @@ class Fname:
             return NotImplemented
 
 
-    def __and__(self, other) -> bool:
+    def __matmul__(self, other) -> bool:
         """
         returns True if the files' contents are the same. We will
         check to ensure that each is really a file that exists, and
         then check the size before we check the contents.
         """
-        if str(other) == other: other=Fname(other)
+        if not isinstance(other, Fname):
+            raise NotImplemented
+
         if not self or not other: return False
         if len(self) != len(other): return False
-        return self() == other()
+
+        # Gotta look at the contents. See if our hash is known.
+        if not len(self._content_hash): self()
+            
+        # Make sure the other object's hash is known.
+        if not len(other._content_hash): other()
+        return self._content_hash == other._content_hash
 
 
-    def is_URI(self) -> bool:
+    @property
+    def all_but_ext(self) -> str:
         """ 
-        Returns true if the original string used in the ctor was
-            something like "file://..." or "http://..." 
+        returns: -- The directory, with the filename stub, but no extension.
+
+        f.all_but_ext() =>> '/home/data/import/big.file' ... note lack of trailing dot
         """
 
-        return self._is_URI
+        return self._all_but_ext
 
 
+    @property
     def fqn(self) -> str:
         """ 
         returns: -- The fully qualified name.
@@ -183,6 +230,7 @@ class Fname:
         return self._fqn
 
 
+    @property
     def directory(self, terminated:bool=False) -> str:
         """ 
         returns: -- The directory part of the name.
@@ -197,16 +245,7 @@ class Fname:
             return self._dir
 
 
-    def fname(self) -> str:
-        """ 
-        returns: -- The filename only (no directory), including the extension.
-
-        f.fname() =>> 'big.file.dat'
-        """
-
-        return self._fname
-
-
+    @property
     def ext(self) -> str:
         """ 
         returns: -- The extension, if any.
@@ -217,16 +256,18 @@ class Fname:
         return self._ext
 
 
-    def all_but_ext(self) -> str:
+    @property
+    def fname(self) -> str:
         """ 
-        returns: -- The directory, with the filename stub, but no extension.
+        returns: -- The filename only (no directory), including the extension.
 
-        f.all_but_ext() =>> '/home/data/import/big.file' ... note lack of trailing dot
+        f.fname() =>> 'big.file.dat'
         """
 
-        return self._all_but_ext
+        return self._fname
 
 
+    @property
     def fname_only(self) -> str:
         """ 
         returns: -- The filename only. No directory. No extension.
@@ -237,22 +278,38 @@ class Fname:
         return self._fname_only
 
 
+    @property
+    def hash(self) -> str:
+        return self._content_hash
+
+    @property
+    def is_URI(self) -> bool:
+        """ 
+        Returns true if the original string used in the ctor was
+            something like "file://..." or "http://..." 
+        """
+
+        return self._is_URI
+
+
     def show(self) -> None:
         """ 
             this is a diagnostic function only. Probably not used
             in production. 
         """
-        print(("if test returns       " + str(int(self._bool__()))))
-        print(("str() returns         " + str(self)))
-        print(("fqn() returns         " + self.fqn()))
-        print(("fname() returns       " + self.fname()))
-        print(("fname_only() returns  " + self.fname_only()))
-        print(("directory() returns   " + self.directory()))
-        print(("ext() returns         " + self.ext()))
-        print(("all_but_ext() returns " + self.all_but_ext()))
-        print(("len() returns         " + str(len(self))))
+        print("if test returns       " + str(int(self.__bool__())))
+        print("str() returns         " + str(self))
+        print("fqn() returns         " + self.fqn)
+        print("fname() returns       " + self.fname)
+        print("fname_only() returns  " + self.fname_only)
+        print("directory() returns   " + self.directory)
+        print("ext() returns         " + self.ext)
+        print("all_but_ext() returns " + self.all_but_ext)
+        print("len() returns         " + str(len(self)))
         s = self()
-        print(("() returns            " + s[0:30] + ' .... ' + s[-30:]))
+        print("() returns            \n" + s[0:30] + ' .... ' + s[-30:])
+        print("hash() returns        " + self.hash)
+
 
 if __name__ == "__main__":
     import sys
@@ -261,7 +318,8 @@ if __name__ == "__main__":
         exit(1)
     f = Fname(sys.argv[1])
     f.show()
+    f()
 else:
     # print(str(os.path.abspath(__file__)) + " compiled.")
-    print("*", end="")
+    pass
 

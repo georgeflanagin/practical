@@ -180,6 +180,13 @@ def me() -> tuple:
     return my_name, my_uid
 
 
+def mkdir(s:str) -> None:
+    try:
+        os.mkdir(s, 0o700)
+    except FileExistsError as e:
+        pass
+
+
 def nicely_display(s:str) -> bool:
     term_size = shutil.get_terminal_size()
     chunk = term_size.lines - 5

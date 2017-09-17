@@ -58,9 +58,9 @@ class Fname:
     Additionally, many manipulations of it are available without constant
     reparsing. A common use is that the str operator returns the fully
     qualified name.
-
-    NOTE: Fname only deals with files' names not their contents!!!
     """
+
+    BUFSIZE = 65536 
 
     def __init__(self, s:str):
         """ 
@@ -124,21 +124,15 @@ class Fname:
     def __call__(self, sep:str=None) -> Union[str, List[str]]:
         """
         Return the contents of the file as an str object.
-
-        Note: Invoking this function will also calculate the MD5 sum of the
-        contents of the file. It's a cheap operation, and as long as we are
-        reading the file, we might as well.
         """
 
         if not self: return None
-
-        with open(str(self)) as f:
-            if sep is None: r_val = f.read()
-            else: r_val = f.read().split(sep)
-        print(type(r_val))
-        self._content_hash = hashlib.md5(r_val.encode('utf-8')).hexdigest()
-
-        return r_val
+        
+        with open(str(self), 'rb') as f:
+            while True:
+                segment = f.read(Fname.BUFSIZE)
+                if not segment: break
+                yield segment
 
 
     def __len__(self) -> int:
@@ -280,7 +274,24 @@ class Fname:
 
     @property
     def hash(self) -> str:
+        """
+        Return the hash if it has already been calculated, otherwise
+        calculate it and then return it. 
+        """
+        if len(self._content_hash) > 0: 
+            return self._content_hash
+
+        hasher = hashlib.md5()
+
+        with open(str(self), 'rb') as f:
+            while True:
+                segment = f.read(Fname.BUFSIZE)
+                if not segment: break
+                hasher.update(segment)
+        
+        self._content_hash = hasher.hexdigest()
         return self._content_hash
+
 
     @property
     def is_URI(self) -> bool:

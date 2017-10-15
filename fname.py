@@ -102,7 +102,7 @@ class Fname:
             tup = urlparse(s)
             self._fqn = tup.path
         else:
-            self._fqn = os.path.abspath(s)
+            self._fqn = os.path.abspath(os.path.expandvars(os.path.expanduser(s)))
         self._dir, self._fname = os.path.split(self._fqn)
         self._fname_only, self._ext = os.path.splitext(self._fname)
         self._all_but_ext = self._dir + os.path.sep + self._fname_only

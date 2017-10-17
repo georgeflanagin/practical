@@ -402,3 +402,10 @@ def tombstone(args=None) -> int:
         a.append(str(args))
     sys.stderr.write(" ".join(a) + "\n")
 
+
+def type_and_text(e:Exception) -> str:
+    type_name = str(type(e)).split()[1][1:-2]
+    text = str(e)
+    return "object of type {} equal to {}".format(type_name, text)
+
+

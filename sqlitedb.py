@@ -58,17 +58,20 @@ class SQLiteDB:
 
         force_new_db -- will attempt to remove anything at `path_to_db`
 
-        local_DDL -- if this 
+        local_DDL -- if present, this parameter can provide additional DDL
+            statements to be executed after schema statements.
         """
         stmt = ""
+        self.OK = None
         self.db = None
         self.cursor = None
-        self.name = None
 
         global schema
 
-        db_file = fname.Fname(path_to_db)
+        self.name = db_file = fname.Fname(path_to_db)
         gkf.tombstone("Database name is " + str(db_file))
+        results = [1]
+
         if force_new_db:
             try:
                 gkf.tombstone("Attempting to remove old database.")
@@ -89,33 +92,48 @@ class SQLiteDB:
         try:
             gkf.tombstone("Attempting to create database in " + str(db_file))
             self.db = sqlite3.connect(str(db_file), timeout=30, isolation_level='DEFERRED')
-            gkf.tombstone("New ishtar.db created: " + str(db_file))
+            gkf.tombstone("New database created: " + str(db_file))
 
             results = [0]
             results.extend([ self.db.execute(stmt) for stmt in gkf.listify(schema) ])
-            results.extend([ self.db.execute(stmt) for stmt in gkf.listify(local_DDL) ])
-            OK = sum(results) == 0
 
         except sqlite3.OperationalError as e:
             gkf.tombstone(str(e))
-            if stmt: gkf.tombstone(stmt)
+            gkf.tombstone(stmt)
             exit(os.EX_CANTCREAT)
 
         else:
             self.cursor = self.db.cursor()
             gkf.tombstone('cursor created.')
-
-        finally:
-            self._keys_on()
+            results.extend([ self.db.execute(stmt) for stmt in gkf.listify(local_DDL) ])
+            self.keys_on()
             gkf.tombstone('foreign keys are on')
 
+        finally:
+            self.OK = sum(results) == 0
 
-    def _keys_off(self):
+
+    def __str__(self) -> str:
+        """ For simplicity """
+
+        return self.name
+
+
+    def __bool__(self) -> bool:
+        """
+        We consider everything "OK" if the object is attached to an open 
+        database, and the last operation went well.
+        """
+
+        return self.db is not None and self.OK is True
+
+
+    def keys_off(self) -> None:
         self.cursor.execute('pragma foreign_keys = 0')
         self.cursor.execute('pragma synchronous = OFF')
 
 
-    def _keys_on(self):
+    def keys_on(self) -> None:
         self.cursor.execute('pragma foreign_keys = 1')
         self.cursor.execute('pragma synchronous = FULL')
 
@@ -125,7 +143,17 @@ class SQLiteDB:
         Wrapper that automagically returns rowsets for SELECTs and 
         number of rows affected for other DML statements.
         """        
-        if SQL.strip().lower().startswith('select'):
-            return self.cursor.execute(SQL).fetchall()
-        else:
-            return self.cursor.execute(SQL)
+        try:
+            if SQL.strip().lower().startswith('select'):
+                rval = self.cursor.execute(SQL).fetchall()
+            else:
+                rval = self.cursor.execute(SQL)
+            self.OK = True
+
+        except Exception as e:
+            gkf.tombstone(gkf.type_and_text(e))
+            self.OK = False
+
+        finally:
+            return rval
+

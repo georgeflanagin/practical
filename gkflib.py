@@ -163,10 +163,13 @@ def iso_time(seconds: int) -> str:
     return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(seconds))
 
 
-def listify(x) -> list:
+def listify(x:Any) -> list:
     """ change a single element into a list containing that element, but
     otherwise just leave it alone. """
-    if not x: return []
+    try:
+        if not x: return []
+    except NameError as e:
+        return []
     if isinstance(x, list): return x
     return [x]
 

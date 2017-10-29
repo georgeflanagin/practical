@@ -31,6 +31,7 @@ except ImportError as e:
 
 import pandas
 import pprint as pp
+import pwd
 import re
 import shlex
 import signal
@@ -388,7 +389,7 @@ def now_as_string(s:str = "T") -> str:
 
     2007-02-07 @ 23:11:45
     """
-    return datetime.now().isoformat()[:21].replace("T",s)
+    return datetime.datetime.now().isoformat()[:21].replace("T",s)
 
 
 def pids_of(partial_process_name:str, anywhere:bool=False) -> list:

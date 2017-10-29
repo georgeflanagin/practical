@@ -1,4 +1,52 @@
 # -*- coding: utf-8 -*-
+
+import os
+import sys
+
+""" Generic, bare functions, not a part of any object or service. """
+import argparse
+import atexit
+import calendar
+import croniter
+import datetime
+try:
+    import dateutil
+    from   dateutil import parser
+except ImportError as e:
+    print('urutils requires dateutil.')
+    sys.exit(os.EX_SOFTWARE)
+
+import functools
+from   functools import reduce
+import getpass
+import inspect
+import json
+import multimap
+import operator
+try:
+    import paramiko
+except ImportError as e:
+    print('urutils requires paramiko.')
+    sys.exit(os.EX_SOFTWARE)
+
+import pandas
+import pprint as pp
+import re
+import shlex
+import signal
+import socket
+import string
+try:
+    import sortedcontainers
+except ImportError as e:
+    print('urutils requires sortedcontainers.')
+    sys.exit(os.EX_SOFTWARE)
+
+import subprocess
+import time
+import traceback
+
+# -*- coding: utf-8 -*-
 import typing
 from   typing import *
 
@@ -12,61 +60,91 @@ __email__ =         'me@georgeflanagin.com'
 __status__ =        'production'
 __licence__ =       'http://www.gnu.org/licenses/gpl-3.0.en.html'
 
-import base64
-import bs4
-import collections
-from   datetime import datetime
-import functools
-import grp
-import inspect
-import multimap 
-import numpy
-import operator
-import os
-import pandas
-import pwd
-import random
-import re
-from   scipy.fftpack import fft
-import shutil
-import sys
-from   textwrap import TextWrapper
-import time
-import traceback
+RED='\033[31m'
+YELLOW='\033[33m'
+BLUE='\033[34m'
+REVERT='\033[0m'
 
-"""
-Some utility functions to help us debug the deep crashes
-that I am so well known for creating inside programs with large
-data structures. They really have nothing to do with Ishtar, and I
-use them everywhere.
-"""
 
 START_TIME = time.time()
 
-def positions(x_list:list) -> pandas.DataFrame:
-    """
-    Given a list of hashables, return a pandas DataFrame where the 
-    column names are the distinct members of the list, and the
-    values at the i-th row are /one/ if that hashable is present at
-    i-th row. Otherwise, /zero/. 
-    """
-    x_set = set(x_list)
-    binary_functions = pandas.DataFrame(0, 
-            index=numpy.arange(len(x_list)), 
-            columns=x_set)
-    tombstone('created a dataframe that has shape ' + str(binary_functions.shape))
+def blind(s:str) -> str:
+    global REVERSE
+    global REVERT
+    return " " + REVERSE + s + REVERT + " "
 
-    for i_pos, x_item in enumerate(x_list):
-        binary_functions[x_item][i_pos] = 1
-    tombstone('all bits set')
-    
-    for _ in x_set:
-        f = binary_functions[_]
-        y = fft(f)
-        print(_ + ' => ' + str(y))
-    
-    return binary_functions
- 
+
+
+def cron_to_str(cron:tuple) -> dict:
+    """
+    Return an English explanation of a crontab entry.
+    """
+
+    if len(cron) != 5: return "This does not appear to be a cron schedule"
+
+    keynames=["a_minutes","b_hours","c_days","d_months","e_dows"]
+    explanation = dict.fromkeys(keynames)
+
+    for time_unit, sched in zip(keynames, cron):
+
+        # This is self explanatory, right?
+        if sched == star:
+            explanation[time_unit] = 'all ' + time_unit[2:]
+            continue
+
+        # Test for the exact value (often the case for min, hr, dow)
+        valid = sorted(list(sched))
+        if len(valid) == 1:
+            explanation[time_unit] = time_unit[2:] + " " + str(valid[0])
+            continue
+
+        if valid == list(range(valid[0], valid[-1]+1)):
+            explanation[time_unit] = (time_unit[2:] + " " + str(valid[0]) +
+                " to " + str(valid[-1]))
+            continue
+
+        # Test for every fifth minute, third month, etc. Maybe some
+        # explanation is required ... zip() stops when the first target
+        # of the pair is empty. We subtract the neighbors (remember, it
+        # already sorted), and make a set. If the set only has one
+        # element, then the neighbors are equally spaced apart.
+
+        diffs = set([ j - i for i, j in zip(valid, valid[1:]) ])
+        if len(diffs) == 1:
+            explanation[time_unit] = (time_unit[2:] +
+                " every " + str(diffs.pop()) +
+                " from " + str(valid[0]) + " to " + str(valid[-1]))
+            continue
+
+        # TODO: tune this up a bit.
+
+        explanation[time_unit] = time_unit[2:] + " in " + str(valid)
+
+    return explanation
+
+
+def crontuple_now():
+    """
+    Return /now/ as a cron-style tuple.
+    """
+
+    return datetime.datetime(*datetime.datetime.now().timetuple()[:6])
+
+
+def dump_cmdline(args:argparse.ArgumentParser, return_it:bool=False) -> str:
+    """
+    Print the command line arguments as they would have been if the user
+    had specified every possible one (including optionals and defaults).
+    """
+
+    if not return_it: print("")
+    opt_string = ""
+    for _ in sorted(vars(args).items()):
+        opt_string += " --"+ _[0].replace("_","-") + " " + str(_[1])
+    if not return_it: print(opt_string + "\n")
+
+    return opt_string if return_it else ""
+
 
 def dump_exception(e: Exception,
         line: int=0,
@@ -141,20 +219,45 @@ def formatted_stack_trace(as_string: bool = False) -> list:
     return ["\n".join(r)] if as_string else r
 
 
-def ugroups(user:str='') -> List[int]:
+def fcn_signature(*args) -> str:
     """
-    user -- user name of interest.
-
-    returns -- a list of gids associated with that user.
+    provide a string for debugging that resembles a function's actual
+    arguments; i.e., how it was called. The zero-th element of args
+    should be the name of the function, and then the arguments follow.
     """
-    user = me() if not user else user
-    groups = [g.gr_name for g in grp.getgrall() if user in g.gr_mem]
-    gid = pwd.getpwnam(user).pw_gid
-    groups.append(grp.getgrgid(gid).gr_name)
+    if not args: return "()"
 
-    return groups
+    return args[0] + "(" + (", ".join([str(_) for _ in args[1:]])) + ")"
 
-    
+
+####
+# G
+####
+
+def get_ssh_host_info(host_name:str=None, config_file:str=None) -> list:
+    """
+    Utility function to get all the ssh config info, or just that
+    for one host.
+
+    host_name -- if given, it should be something that matches an entry
+        in the ssh config file that gets parsed.
+    config_file -- if given (at it usually is not) the usual default
+        config file is used.
+    """
+
+    if config_file is None: config_file = os.path.expanduser("~") + "/.ssh/config"
+
+    try:
+        ssh_conf = paramiko.SSHConfig()
+        ssh_conf.parse(open(config_file))
+    except:
+        raise Exception("could not understand ssh config file " + config_file) from None
+
+    if not host_name: return ssh_conf
+    if host_name == 'all': return ssh_conf.get_hostnames()
+    return None if host_name not in ssh_conf.get_hostnames() else ssh_conf.lookup(host_name)
+
+
 def iso_time(seconds: int) -> str:
     """
     Prints an ISO formatted date/time string based on *local* time including
@@ -183,11 +286,75 @@ def me() -> tuple:
     return my_name, my_uid
 
 
-def mkdir(s:str) -> None:
+def loc_splitter(s: str) -> tuple:
+    """
+    Allow us to deal with remote and local and files.
+    """
+
+    parts = s.split(":")
+    if len(parts) < 2: return None, None, s
+
+    lpart = parts[0]
+    frontmatter = lpart.split("@")
+    if len(frontmatter) < 2:
+        return me(), frontmatter[0], parts[1]
+    else:
+        return frontmatter[0], frontmatter[1], parts[1]
+
+
+####
+# M
+####
+
+def make_dir_or_die(dirname:str, mode=None):
+    """
+    Do our best to make the given directory (and any required
+    directories upstream). If we cannot, then die trying.
+    """
+
+    if not mode: mode=0o700
+
+    try:
+        os.makedirs(dirname, mode)
+
+    except FileExistsError as e:
+        # It's already there.
+        pass
+
+    except PermissionError as e:
+        # This is bad.
+
+        tombstone()
+        tombstone("Permissions error creating/using " + dirname)
+        sys.exit(os.EX_NOPERM)
+
+    except NotADirectoryError as e:
+        tombstone()
+        tombstone(dirname + " exists, but it is not a directory")
+        sys.exit(os.EX_CANTCREAT)
+
+    except Exception as e:
+        tombstone()
+        tombstone(type_and_text(e))
+        sys.exit(os.EX_IOERR)
+
+    if (os.stat(dirname).st_mode & 0o777) >= mode:
+        return
+    else:
+        tombstone()
+        tombstone("Permissions on " + dirname + " less than requested.")
+
+
+def mkdir(s:str) -> bool:
+    success = True
     try:
         os.mkdir(s, 0o700)
     except FileExistsError as e:
         pass
+    except Exception as e:
+        success = False
+    
+    return success    
 
 
 def nicely_display(s:str) -> bool:
@@ -224,6 +391,53 @@ def now_as_string(s:str = "T") -> str:
     return datetime.now().isoformat()[:21].replace("T",s)
 
 
+def pids_of(partial_process_name:str, anywhere:bool=False) -> list:
+    """
+    This function gets a list of matching process IDs.
+
+    partial_process_name -- a text shred containing the bit you want
+        to find.
+    anywhere -- If False, we effectively look for the a user associated
+        with the process name. If True, then we look for the shred anywhere
+        in the name not just at the beginning.
+
+    returns -- a possibly empty list of ints containing the pids
+        whose names match the text shred.
+    """
+
+    # Yes, this function could all be one line, but I'm trying to avoid
+    # stressing out the human reader's comprehension with a nested
+    # list comprehension.
+    try:
+        matches = [ _ for _ in
+            subprocess.check_output(shlex.split("/bin/ps -ef"),
+                universal_newlines=True).split("\n")
+            if partial_process_name in _
+            ] \
+        if anywhere else \
+            [ _ for _ in
+            subprocess.check_output(shlex.split("/bin/ps -ef"),
+                universal_newlines=True).split("\n")
+            if _.startswith(partial_process_name)
+            ]
+    except Exception as e:
+        tombstone(type_and_text(e))
+        return []
+
+    pids = []
+    try:
+
+        # Now we are really looking for the process name.
+        pids = [ int(_.split()[1])
+            for _ in matches
+                if partial_process_name in _.split()[-1]]
+
+    except Exception as e:
+        tombstone(type_and_text(e))
+
+    return pids
+
+
 def polish(args:dict, doc:str) -> str:
     """
     You never know who is going to read these things, so let's allow
@@ -248,6 +462,31 @@ def polish(args:dict, doc:str) -> str:
 
     return wrapper.fill(''.join(new_doc))
 
+
+def positions(x_list:list) -> pandas.DataFrame:
+    """
+    Given a list of hashables, return a pandas DataFrame where the 
+    column names are the distinct members of the list, and the
+    values at the i-th row are /one/ if that hashable is present at
+    i-th row. Otherwise, /zero/. 
+    """
+    x_set = set(x_list)
+    binary_functions = pandas.DataFrame(0, 
+            index=numpy.arange(len(x_list)), 
+            columns=x_set)
+    tombstone('created a dataframe that has shape ' + str(binary_functions.shape))
+
+    for i_pos, x_item in enumerate(x_list):
+        binary_functions[x_item][i_pos] = 1
+    tombstone('all bits set')
+    
+    for _ in x_set:
+        f = binary_functions[_]
+        y = fft(f)
+        print(_ + ' => ' + str(y))
+    
+    return binary_functions
+ 
 
 def q64(s, quote_type=1):
     """ Convert to Base64 before quoting.
@@ -381,6 +620,53 @@ def scrub(s:str, args:object, scrubbing:int) -> str:
     return s
 
 
+def stalk_and_kill(process_name:str) -> bool:
+    """
+    This function finds process_name ... and
+    kills them by sending them a SIGTERM.
+
+    returns True or False based on whether we assassinated our
+        ancestral impostors. If there are none, we return True because
+        in the logical meaning of "we got them all," we did.
+    """
+
+    tombstone('Attempting to remove processes beginning with ' + process_name)
+    # Assume all will go well.
+    got_em = True
+
+    for pid in pids_of(process_name, True):
+
+        # Be nice about it.
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except:
+            tombstone("Process " + str(pid) + " may have terminated before SIGTERM was sent.")
+            continue
+
+        # wait two seconds
+        time.sleep(2)
+        try:
+            # kill 0 will fail if the process is gone
+            os.kill(pid, 0)
+        except:
+            tombstone("Process " + str(pid) + " has been terminated.")
+            continue
+
+        # Darn! It's still running. Let's get serious.
+        os.kill(pid, signal.SIGKILL)
+        time.sleep(2)
+        try:
+            # As above, kill 0 will fail if the process is gone
+            os.kill(pid, 0)
+            tombstone("Process " + str(pid) + " has been killed.")
+        except:
+            continue
+        tombstone(str(pid) + " is obdurate, and will not die.")
+        got_em = False
+
+    return got_em
+
+
 def tombstone(args=None) -> int:
     """
     This is an augmented print() statement that has the advantage
@@ -407,5 +693,42 @@ def type_and_text(e:Exception) -> str:
     type_name = str(type(e)).split()[1][1:-2]
     text = str(e)
     return "object of type {} equal to {}".format(type_name, text)
+
+
+def ugroups(user:str='') -> List[int]:
+    """
+    user -- user name of interest.
+
+    returns -- a list of gids associated with that user.
+    """
+    user = me() if not user else user
+    groups = [g.gr_name for g in grp.getgrall() if user in g.gr_mem]
+    gid = pwd.getpwnam(user).pw_gid
+    groups.append(grp.getgrgid(gid).gr_name)
+
+    return groups
+
+    
+def version(full:bool = True) -> str:
+    """
+    Do our best to determine the git commit ID ....
+    """
+    try:
+        v = subprocess.check_output(
+            ["/usr/bin/git", "rev-parse", "--short", "HEAD"],
+            universal_newlines=True
+            ).strip()
+        if not full: return v
+    except:
+        v = 'unknown'
+    else:
+        mods = subprocess.check_output(
+            ["/usr/bin/git", "status", "--short"],
+            universal_newlines=True
+            )
+        if mods.strip() != mods:
+            v += (", with these files modified: \n" + str(mods))
+    finally:
+        return v
 
 

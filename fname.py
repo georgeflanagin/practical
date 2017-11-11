@@ -121,18 +121,17 @@ class Fname:
         return os.path.isfile(self._fqn)
 
 
-    def __call__(self, sep:str=None) -> Union[str, List[str]]:
+    def __call__(self, new_content:Any=None) -> Union[str, int]:
         """
         Return the contents of the file as an str object.
         """
 
-        if not self: return None
-        
-        with open(str(self), 'rb') as f:
-            while True:
-                segment = f.read(Fname.BUFSIZE)
-                if not segment: break
-                yield segment
+        if new_content is None:
+            with open(str(self), 'r') as f:
+                return f.read()
+        else:
+            with open(str(self), 'w+') as f:
+                return f.write(str(new_content))
 
 
     def __len__(self) -> int:
@@ -187,7 +186,7 @@ class Fname:
         then check the size before we check the contents.
         """
         if not isinstance(other, Fname):
-            raise NotImplemented
+            return NotImplemented
 
         if not self or not other: return False
         if len(self) != len(other): return False

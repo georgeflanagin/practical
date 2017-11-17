@@ -6,6 +6,7 @@ import sys
 """ Generic, bare functions, not a part of any object or service. """
 import argparse
 import atexit
+import base64
 import calendar
 import croniter
 import datetime
@@ -579,47 +580,6 @@ def random_string(length:int=10, all_alpha:bool=True) -> str:
      
     return t[:length]       
         
-
-def scrub(s:str, args:object, scrubbing:int) -> str:
-    """
-    If there is no input or we are not scrubbing, bail out.
-    """
-    if not len(s) * scrubbing: return s
-
-    subs = [ 
-             (u'\u2014', "---")
-            ,(u'\u2013', "--")
-            ,(u'\u2012', '-')
-            ,(u'\u2010', '-')
-            ,(u'\u2011', '-')
-            ,('[“”"]', "")
-            ,('’', "'")   
-            ,("''", "'")
-            ,('…', '')
-            ,('\r\n', '\n')]
-
-    tombstone("Scrubbing " + str(len(s)) + " chars of input.")
-
-    if scrubbing & 1:
-        for _ in subs:
-            original_len = len(s)
-            s = re.sub(_[0], _[1], s)
-            new_len = len(s)
-            if _ == subs[-1]: continue
-
-    if scrubbing & 2:
-        tombstone("Removing SGML tags.")
-        s = bs4.BeautifulSoup(s, 'lxml').get_text()
-
-    if scrubbing & 4:
-        tombstone("Scrubbing > 2, so flattening to ASCII")
-        s = s.encode('ascii', 'ignore')
-        tombstone("Smack! Flat ASCII remains.")
-
-    tombstone("Scrubbed text is now " + str(len(s)) + " chars.")
-
-    return s
-
 
 def stalk_and_kill(process_name:str) -> bool:
     """

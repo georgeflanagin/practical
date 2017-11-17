@@ -85,7 +85,7 @@ class Fname:
         """
 
         if not s or not isinstance(s, str): 
-            raise ValueError('Cannot create empty Fname object.')
+            raise ValueError('Cannot create [empty] Fname object from {} of type {}'.format(s, type(s)))
 
         self._me = s
         self._is_URI = False

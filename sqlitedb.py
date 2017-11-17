@@ -47,7 +47,8 @@ class SQLiteDB:
     """
     def __init__(self, path_to_db:str, 
                     force_new_db:bool = False, 
-                    local_DDL:list = []):
+                    local_DDL:list = [],
+                    schema:list = []):
         """
         Does what it says. Opens the database if present, and
         creates the database if it is MIA.
@@ -60,18 +61,18 @@ class SQLiteDB:
 
         local_DDL -- if present, this parameter can provide additional DDL
             statements to be executed after schema statements.
+
+        schema -- DLL statements to build the database anew.
         """
         stmt = ""
         self.OK = None
         self.db = None
         self.cursor = None
 
-        global schema
-
         self.name = db_file = fname.Fname(path_to_db)
         gkf.tombstone("Database name is " + str(db_file))
-        results = [1]
 
+        error_on_init = False
         if force_new_db:
             try:
                 gkf.tombstone("Attempting to remove old database.")
@@ -87,15 +88,25 @@ class SQLiteDB:
             self.db = sqlite3.connect(str(db_file), timeout=30, isolation_level='DEFERRED')
             self.cursor = self.db.cursor()
             gkf.tombstone("Database opened: " + str(fname.Fname(db_file)))
-            return
+
+            try:
+                a = [ self.db.execute(stmt) for stmt in gkf.listify(local_DDL) ]
+            except sqlite3.OperationalError as e:
+                gkf.tombstone(gkf.type_and_text(e))
+                self.OK = False
+            finally:
+                return 
 
         try:
             gkf.tombstone("Attempting to create database in " + str(db_file))
             self.db = sqlite3.connect(str(db_file), timeout=30, isolation_level='DEFERRED')
             gkf.tombstone("New database created: " + str(db_file))
 
-            results = [0]
-            results.extend([ self.db.execute(stmt) for stmt in gkf.listify(schema) ])
+            try:
+                a = [ self.db.execute(stmt) for stmt in gkf.listify(schema) ]
+            except sqlite3.OperationalError as e:
+                gkf.tombstone(gkf.type_and_text(e))
+                error_on_init = True
 
         except sqlite3.OperationalError as e:
             gkf.tombstone(str(e))
@@ -105,12 +116,12 @@ class SQLiteDB:
         else:
             self.cursor = self.db.cursor()
             gkf.tombstone('cursor created.')
-            results.extend([ self.db.execute(stmt) for stmt in gkf.listify(local_DDL) ])
+
             self.keys_on()
             gkf.tombstone('foreign keys are on')
 
         finally:
-            self.OK = sum(results) == 0
+            self.OK = not error_on_init
 
 
     def __str__(self) -> str:

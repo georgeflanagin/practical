@@ -6,6 +6,7 @@ import sys
 """ Generic, bare functions, not a part of any object or service. """
 import argparse
 import atexit
+import base64
 import calendar
 import croniter
 import datetime

@@ -35,6 +35,7 @@ import pprint as pp
 import pwd
 import re
 import shlex
+import shutil
 import signal
 import socket
 import string

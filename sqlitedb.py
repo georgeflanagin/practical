@@ -150,8 +150,8 @@ class SQLiteDB:
         with the pandas library.
         """
 
-        if not self.cursor: raise Exception('No active cursor!')
-        return self.cursor
+        if not self.db: raise Exception('Not connected!')
+        return self.db
 
 
     def keys_off(self) -> None:

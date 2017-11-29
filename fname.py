@@ -1,24 +1,25 @@
 # -*- coding: utf-8 -*-
 
-""" Fname, a portable class for manipulating long, complex, and
-    confusing path and file names on Linux and Windows.
+""" 
+Fname, a portable class for manipulating long, complex, and
+confusing path and file names on Linux and Windows.
+Experience has taught us that we make a lot of mistakes by placing
+files in the wrong directories, or getting mixed up over extensions.
+In the examples below, we will use the file name:
 
-    Experience has taught us that we make a lot of mistakes by placing
-    files in the wrong directories, or getting mixed up over extensions.
-    In the examples below, we will use the file name:
+       f = Fname('/home/data/import/big.file.dat')
 
-           f = Fname('/home/data/import/big.file.dat')
+This is implemented a portable way, so the same logic will work
+on Windows NTFS for the above path written as:
 
-    This is implemented a portable way, so the same logic will work
-    on Windows NTFS for the above path written as:
+       \\home\data\import\big.file.dat
 
-           \\home\data\import\big.file.dat
-
-    This class supports all the comparison operators ( ==, !=, <, <=,
-    >, >= ) and when doing so it uses the fully qualifed name.
+This class supports all the comparison operators ( ==, !=, <, <=,
+>, >= ) and when doing so it uses the fully qualifed name.
 """
 
 
+import  fcntl
 from   functools import total_ordering
 import hashlib
 import os
@@ -46,28 +47,25 @@ class Fname:
 class Fname:
     """ 
     Simple class to make filename manipulation more readable.
-
     Example:
-
         f = Fname('file.ext')
-
     The resulting object, f, can be tested with if to see if it exists:
-
         if not f: ...error...
-
     Additionally, many manipulations of it are available without constant
     reparsing. A common use is that the str operator returns the fully
     qualified name.
     """
 
     BUFSIZE = 65536 
+    __slots__ = [ '_me', '_is_URI', '_fqn', '_dir', '_fname',
+        '_fname_only', '_ext', '_all_but_ext', '_content_hash',
+        '_is_URI', '_lock_handle']
 
     def __init__(self, s:str):
         """ 
         Create an Fname from a string that is a file name or a well
         behaved URI. An Fname consists of several strings, each of which
         corresponds to one of the commonsense parts of the file name.
-
         Members:
             _me -- whatever you used to create the object.
             _is_URI -- boolean
@@ -79,13 +77,12 @@ class Fname:
             _all_but_ext -- the complement of _ext
             _content_hash -- hexdigit string representing the contents
                 the last time the file was read.
-
+            _lock_handle -- an entry in the logical unit table.
         Raises a ValueError if the argument is empty.
-
         """
 
         if not s or not isinstance(s, str): 
-            raise ValueError('Cannot create [empty] Fname object from {} of type {}'.format(s, type(s)))
+            raise ValueError('Cannot create empty Fname object.')
 
         self._me = s
         self._is_URI = False
@@ -107,12 +104,13 @@ class Fname:
         self._fname_only, self._ext = os.path.splitext(self._fname)
         self._all_but_ext = self._dir + os.path.sep + self._fname_only
 
+        self._lock_handle = None
+
 
     def __bool__(self) -> bool:
         """ 
         returns: -- True if the Fname object is associated with something
         that exists in the file system AT THE TIME THE FUNCTION IS CALLED.
-
         Note: this allows one to build the Fname object at a time when "if"
         would return False, open the file for write, test again, and "if"
         will then return True.
@@ -121,17 +119,21 @@ class Fname:
         return os.path.isfile(self._fqn)
 
 
-    def __call__(self, new_content:Any=None) -> Union[str, int]:
+    def __call__(self, new_content:str=None) -> Union[bytes, Fname]:
         """
         Return the contents of the file as an str object.
         """
 
+        content = ""
         if new_content is None:
-            with open(str(self), 'r') as f:
-                return f.read()
+            with open(str(self), 'rb') as f:
+                content = f.read()
         else:
-            with open(str(self), 'w+') as f:
-                return f.write(str(new_content))
+            with open(str(self), 'wb+') as f:
+                f.write(bytes(new_content))
+            
+        return content if new_content is None else self
+        
 
 
     def __len__(self) -> int:
@@ -145,7 +147,6 @@ class Fname:
     def __str__(self) -> str:
         """ 
         returns: -- The fully qualified name.
-
         str(f) =>> '/home/data/import/big.file.dat'
         """
 
@@ -203,7 +204,6 @@ class Fname:
     def all_but_ext(self) -> str:
         """ 
         returns: -- The directory, with the filename stub, but no extension.
-
         f.all_but_ext() =>> '/home/data/import/big.file' ... note lack of trailing dot
         """
 
@@ -211,23 +211,63 @@ class Fname:
 
 
     @property
-    def fqn(self) -> str:
-        """ 
-        returns: -- The fully qualified name.
-
-        f.fqn() =>> '/home/data/import/big.file.dat'
-
-        NOTE: this is the same result as you get with str(f)
+    def busy(self) -> bool:
         """
+        returns: -- 
+                True: iff the file exists, we have access, and we cannot 
+                    get get an exclusive lock.
+                None: if the file does not exist, or if it exists and we 
+                    have no access to the file (therefore we can never 
+                    lock it).
+                False: otherwise. 
+        """
+        
+        # 1: does the file exist?
+        if not self: return None
 
-        return self._fqn
+        # 2: if the file is locked by us, then it is not "busy".
+        if self.locked: return False
+
+        # 3: are we allowed to open the file?
+        if not os.access(str(self), os.R_OK): 
+            print('No access to {}.'.format(str(self)))
+            return None
+
+        # 4: OK, we are allowed access, but can we open it? 
+        try:
+            fd = os.open(str(self), os.O_RDONLY)
+        except Exception as e:
+            print('Cannot open {}, so it is busy.'.format(str(self)))
+            return True
+
+        # 5: Can we lock it?
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        except BlockingIOError as e:
+            print('No lock available on {}, so it is busy'.format(str(self)))
+            rval = True
+
+        except Exception as e:
+            print(str(e))
+            rval = None
+
+        else:
+            print('{} is locked.'.format(str(self)))
+            rval = False
+
+        finally:
+            try:
+                os.close(fd)
+            except:
+                pass
+            return rval
 
 
     @property
     def directory(self, terminated:bool=False) -> str:
         """ 
         returns: -- The directory part of the name.
-
         f.directory() =>> '/home/data/import' ... note the lack of a
             trailing solidus in the default behavior.
         """
@@ -242,7 +282,6 @@ class Fname:
     def ext(self) -> str:
         """ 
         returns: -- The extension, if any.
-
         f.ext() =>> 'dat'
         """
 
@@ -253,7 +292,6 @@ class Fname:
     def fname(self) -> str:
         """ 
         returns: -- The filename only (no directory), including the extension.
-
         f.fname() =>> 'big.file.dat'
         """
 
@@ -264,11 +302,21 @@ class Fname:
     def fname_only(self) -> str:
         """ 
         returns: -- The filename only. No directory. No extension.
-
         f.fname_only() =>> 'big.file'
         """
 
         return self._fname_only
+
+
+    @property
+    def fqn(self) -> str:
+        """ 
+        returns: -- The fully qualified name.
+        f.fqn() =>> '/home/data/import/big.file.dat'
+        NOTE: this is the same result as you get with str(f)
+        """
+
+        return self._fqn
 
 
     @property
@@ -302,6 +350,30 @@ class Fname:
         return self._is_URI
 
 
+    def lock(self, exclusive:bool = True, nowait:bool = True) -> bool:
+        mode = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+        if nowait: mode = mode | fcntl.LOCK_NB
+        
+        try:
+            self._lock_handle = os.open(str(self), os.O_RDONLY)
+            fcntl.flock(self._lock_handle, mode)
+        except Exception as e:
+            print(str(e))
+            return False
+        else:
+            return True
+            
+
+    @property
+    def locked(self) -> bool:
+        """
+        Test it...  Note that this function returns True if this process
+            has the file locked. self.busy checks if someone else has the
+            file locked.
+        """
+        return self._lock_handle is not None
+
+
     def show(self) -> None:
         """ 
             this is a diagnostic function only. Probably not used
@@ -317,9 +389,29 @@ class Fname:
         print("all_but_ext() returns " + self.all_but_ext)
         print("len() returns         " + str(len(self)))
         s = self()
-        print("() returns            \n" + s[0:30] + ' .... ' + s[-30:])
+        try:
+            print("() returns            \n" + s[0:30] + ' .... ' + s[-30:])
+        except TypeError as e:
+            print("() doesn't make sense on a binary file.")
         print("hash() returns        " + self.hash)
+        print("locked() returns      " + str(self.locked))
 
+
+    def unlock(self) -> bool:
+        """
+        returns: -- True iff the file was locked before the call,
+            False otherwise.
+        """
+        try:
+            fcntl.flock(self._lock_handle, fcntl.LOCK_UN)
+        except Exception as e:
+            print(str(e))
+            return False
+        else:
+            return True
+        finally:
+            self._lock_handle = None
+            
 
 if __name__ == "__main__":
     import sys
@@ -332,4 +424,3 @@ if __name__ == "__main__":
 else:
     # print(str(os.path.abspath(__file__)) + " compiled.")
     pass
-

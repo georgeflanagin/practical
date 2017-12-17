@@ -264,6 +264,7 @@ def get_ssh_host_info(host_name:str=None, config_file:str=None) -> list:
 
     if not host_name: return ssh_conf
     if host_name == 'all': return ssh_conf.get_hostnames()
+
     return None if host_name not in ssh_conf.get_hostnames() else ssh_conf.lookup(host_name)
 
 
@@ -280,10 +281,10 @@ def listify(x:Any) -> list:
     otherwise just leave it alone. """
     try:
         if not x: return []
-    except NameError as e:
+    except:
         return []
-    if isinstance(x, list): return x
-    return [x]
+    else:
+        return x if isinstance(x, list) else [x]
 
 
 def me() -> tuple:
@@ -350,8 +351,7 @@ def make_dir_or_die(dirname:str, mode=None):
     if (os.stat(dirname).st_mode & 0o777) >= mode:
         return
     else:
-        tombstone()
-        tombstone("Permissions on " + dirname + " less than requested.")
+        tombstone("{} created. Permissions less than requested.".format(dirname))
 
 
 def mkdir(s:str) -> bool:

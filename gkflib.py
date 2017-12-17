@@ -192,15 +192,21 @@ def empty(o:object) -> bool:
     return r
         
 
-def flip_dict(kv_mapping:dict) -> multimap.MutableMultiMap:
+def flip_dict(kv_mapping:dict) -> Union[dict, multimap.MutableMultiMap]:
     """
     Take the input dictionary, reverse the kv pairs, and return
     the result in a multimap.
-    """
 
-    vk_mapping = multimap.MutableMultiMap()
+    returns -- the flipped dict as a dict if there are no duplicate
+        values, otherwise as a multimap.MutableMultiMap.
+    """
+    vk_mapping = ( {}
+        if len(set(kv_mapping.values())) == len(list(kv_mapping.values()))
+        else multimap.MutableMultiMap() )
+
     for k, v in kv_mapping.items():
         vk_mapping[str(v)] = k
+
     return vk_mapping
 
 

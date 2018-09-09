@@ -77,6 +77,9 @@ def blind(s:str) -> str:
     return " " + REVERSE + s + REVERT + " "
 
 
+def tobytes(s:str) -> bytes:
+    return bytes(s.encode('utf-8'))
+
 
 def cron_to_str(cron:tuple) -> dict:
     """
@@ -398,6 +401,17 @@ def now_as_string(s:str = "T") -> str:
     2007-02-07 @ 23:11:45
     """
     return datetime.datetime.now().isoformat()[:21].replace("T",s)
+
+
+class objectify:
+    """
+    A class wrapper that works like a function to turn a dict
+    into an object for notational convenience.
+    """
+    def __init__(self, d:dict) -> None:
+        self.__dict__ = d
+    
+    
 
 
 def pids_of(partial_process_name:str, anywhere:bool=False) -> list:

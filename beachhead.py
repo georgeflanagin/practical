@@ -43,7 +43,7 @@ if sys.version_info < __required_version__:
     gkf.tombstone('This program requires Python {} or greater.'.format(__required_version__))
     sys.exit(os.EX_SOFTWARE)
 
-class SmallHOP:
+class SocketConnection:
     def __init__(self):
         # Identification members
         self.my_host = socket.getfqdn().replace('-','.')
@@ -83,6 +83,18 @@ class SmallHOP:
     def __str__(self) -> str:
         return "" if not self else "{}:{} {}".format(
             self.remote_host, self.remote_port, self.error_msg())
+
+
+    def block(self) -> None:
+        self.sock.settimeout(None)
+
+
+    def blocking(self) -> bool:
+        return self.sock.getblocking()
+
+
+    def unblock(self) -> None:
+        self.sock.settimeout(0.0)
 
 
     def close(self) -> None:
@@ -229,7 +241,39 @@ class SmallHOP:
 
         finally:
             return self.error is None
+
+
+    def read(self, buffsize:int=4096) -> str:
+        """
+        Read from the socket. 
+
+        buffsize -- read chunks in this size.
+        """
+        message = None
+        try:
+            message = self.sock.recv(buffsize)
+        except KeyboardInterrupt as e:
+            print('Tired of waiting, eh?')
+        except Exception as e:
+            gkf.tombstone(gkf.type_and_text(e))
             
+        return '' if message is None else message.decode('utf-8')
+            
+
+            
+    def send(self, message:str='') -> int:
+        """
+        write the message to the socket.
+    
+        message -- can be bytes or str; always converted to bytes.
+
+        returns -- number of bytes read.
+        """
+        if isinstance(message, str):
+            messsage = gkf.tobytes(message)
+        result = self.sock.sendall(message)
+        return result
+
     
     def timeouts(self) -> tuple:
         return self.tcp_timeout, self.auth_timeout, self.banner_timeout
@@ -293,7 +337,7 @@ class Beachhead(cmd.Cmd):
         
         cmd.Cmd.__init__(self)
         Beachhead.prompt = "\n[beachhead]: "
-        self.hop = SmallHOP()
+        self.hop = SocketConnection()
 
     
     def __bool__(self) -> bool: 
@@ -492,7 +536,7 @@ class Beachhead(cmd.Cmd):
 
     def do_put(self, data:str="") -> None:
         """
-        get a file from the remote host.
+        send a file to the remote host.
         """
         if not self.hop.sftp:
             gkf.tombstone(red('sftp channel is not open.'))
@@ -529,6 +573,29 @@ class Beachhead(cmd.Cmd):
         self.do_exit(data)
 
 
+    def do_read(self, line:str="") -> str:
+        """
+        Try to read the socket.
+
+        returns -- None or the contents of the socket.
+        """
+        message = None
+        try:
+            message = self.hop.sock.read()
+        except Exception as e:
+            gkf.tombstone(gkf.type_and_text(e))
+            gkf.tombstone('socket not readable.')
+            return
+        
+        bmessage = list(gkf.tobytes(message))
+        if set(message) - set(string.printable):
+            for i, _ in enumerate(bmessage):
+                print("{} ".format(_), '')
+                if not i % 16: print('\n')
+        else:
+            print(message)
+
+
     def do_send(self, data:str="") -> None:
         """
         send { file filename | string }
@@ -560,6 +627,24 @@ class Beachhead(cmd.Cmd):
             
         finally:
             self.hop.open_channel()
+
+
+    def do_write(self, msg:str="") -> int:
+        """
+        Write the message to the socket.
+
+        msg -- a str object that gets converted to bytes.
+
+        returns -- number of bytes sent.
+        """
+        try:
+            if not isinstance(msg, bytes):
+                msg = gkf.tobytes(msg)
+            i = self.hop.sock.send(msg)
+        except Exception as e:
+            gkf.tombstone(gkf.type_and_text(e))
+        else:    
+            gkf.tombstone(blue('wrote {} bytes to the socket.'.format(i)))
 
 
     def do_setpass(self, data:str="") -> None:

@@ -139,13 +139,14 @@ class Davis(cmd.Cmd):
             self.connection.open_socket(info[0], int(info[1]))
         except Exception as e:
             gkf.tombstone(gkf.type_and_text(e))
-            return
         else:
+            print('no error in connection attempt.')
+        finally:
             print(str(self.connection))
 
         print('Connected to /something/ at {}:{}'.format(info[0],info[1]))
         print('Ready to talk. Sending TEST')
-        self.connection.send('TEST')
+        OK = self.connection.send('TEST')
         reply = self.read()
         print('Received {} as reply'.format(reply))
 

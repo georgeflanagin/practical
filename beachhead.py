@@ -44,6 +44,17 @@ if sys.version_info < __required_version__:
     sys.exit(os.EX_SOFTWARE)
 
 class SocketConnection:
+
+    """
+    __slots__ = [
+        'my_host', 'user', 'remote_host', 'remote_port',
+        'ssh_info', 'auth_timeout', 'banner_timeout',' tcp_timeout',
+        'sock_type', 'sock_domain', 'password', 'sock',
+        'sock_transport', 'channel', 'client', 'sftp',
+        'error'
+        ]
+    """
+
     def __init__(self):
         # Identification members
         self.my_host = socket.getfqdn().replace('-','.')
@@ -81,8 +92,12 @@ class SocketConnection:
 
 
     def __str__(self) -> str:
-        return "" if not self else "{}:{} {}".format(
-            self.remote_host, self.remote_port, self.error_msg())
+        description = []
+        description.append( "no connection" if not self.sock else "{}:{} {}".format(
+            self.remote_host, self.remote_port, self.error_msg()))
+        for slot in SocketConnection.__slots__:
+            description.append("{} = {}".format(slot, getattr(self, slot)))
+        return "\n".join(description)
 
 
     def block(self) -> None:

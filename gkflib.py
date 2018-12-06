@@ -14,7 +14,7 @@ try:
     import dateutil
     from   dateutil import parser
 except ImportError as e:
-    print('urutils requires dateutil.')
+    print('gkflib requires dateutil.')
     sys.exit(os.EX_SOFTWARE)
 
 import functools
@@ -27,7 +27,7 @@ import operator
 try:
     import paramiko
 except ImportError as e:
-    print('urutils requires paramiko.')
+    print('gkflib requires paramiko.')
     sys.exit(os.EX_SOFTWARE)
 
 import pandas
@@ -42,7 +42,7 @@ import string
 try:
     import sortedcontainers
 except ImportError as e:
-    print('urutils requires sortedcontainers.')
+    print('gkflib requires sortedcontainers.')
     sys.exit(os.EX_SOFTWARE)
 
 import subprocess
@@ -358,15 +358,15 @@ def make_dir_or_die(dirname:str, mode=None):
 
 
 def mkdir(s:str) -> bool:
-    success = True
+    
     try:
         os.mkdir(s, 0o700)
     except FileExistsError as e:
         pass
     except Exception as e:
-        success = False
-    
-    return success    
+        return False
+
+    return True  
 
 
 def nicely_display(s:str) -> bool:

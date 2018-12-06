@@ -602,6 +602,20 @@ def random_string(length:int=10, all_alpha:bool=True) -> str:
     return t[:length]       
         
 
+def show_args(pargs:object) -> None:
+    """
+    Print out the program arguments as they would have been typed
+    in. Command line arguments have a -- in the front, and embedded
+    dashes in the option itself. These are removed and changed to
+    an underscore, respectively.
+    """
+    print("")
+    opt_string = ""
+    for _ in sorted(vars(pargs).items()):
+        opt_string += " --"+ _[0].replace("_","-") + " " + str(_[1])
+    print(opt_string + "\n")    
+
+
 def stalk_and_kill(process_name:str) -> bool:
     """
     This function finds process_name ... and

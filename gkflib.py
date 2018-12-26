@@ -10,13 +10,6 @@ import base64
 import calendar
 import croniter
 import datetime
-try:
-    import dateutil
-    from   dateutil import parser
-except ImportError as e:
-    print('gkflib requires dateutil.')
-    sys.exit(os.EX_SOFTWARE)
-
 import functools
 from   functools import reduce
 import getpass
@@ -403,15 +396,31 @@ def now_as_string(s:str = "T") -> str:
     return datetime.datetime.now().isoformat()[:21].replace("T",s)
 
 
-class objectify:
+###
+# O
+###
+
+class objectify(dict):
     """
-    A class wrapper that works like a function to turn a dict
-    into an object for notational convenience.
+    Make a dict into an object for notational convenience.
     """
-    def __init__(self, d:dict) -> None:
-        self.__dict__ = d
-    
-    
+    def __getattr__(self, k:str) -> object:
+        if k in self: return self[k]
+        else: raise AttributeError("No element named {}".format(k))
+
+    def __setattr__(self, k:str, v:object) -> None:
+        self[k] = v
+
+    def __delattr__(self, k:str) -> None:
+        if k in self: del self[k]
+        else: raise AttributeError("No element named {}".format(k))
+
+
+def sloppy(o:object) -> objectify:
+    """
+    This function lives up to its name
+    """
+    return o if isinstance(o, objectify) else objectify(o)
 
 
 def pids_of(partial_process_name:str, anywhere:bool=False) -> list:

@@ -65,7 +65,7 @@ class SQLiteDB:
         schema -- DLL statements to build the database anew.
         """
         stmt = ""
-        self.OK = None
+        self.OK = True
         self.db = None
         self.cursor = None
 
@@ -139,7 +139,7 @@ class SQLiteDB:
         We consider everything "OK" if the object is attached to an open 
         database, and the last operation went well.
         """
-
+        print(self.OK)
         return self.db is not None and self.OK is True
 
 

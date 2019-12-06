@@ -169,37 +169,8 @@ class Packer:
 
 if __name__ == '__main__':
 
-    x = {'allowed_environments': ['dev', 'test', 'prod'],
- 'cleanup': [],
- 'comment': ['Test for missing name in xform.'],
- 'compiled': (1557504047, '2019-05-10 12:00:47.8'),
- 'name': 'test001',
- 'origin': '/sw/canoe/gkf_home/src/canoelibs/test004.json',
- 'roster': ['source', 'cleanup'],
- 'schedule': [[{32, 4, 39, 11, 46, 18, 53, 25},
-               '*',
-               '*',
-               {1, 3, 5, 7, 9, 11},
-               {6}]],
- 'source': [{'directory': '/sw/canoe/var/data/test001',
-             'file': 'it',
-             'host': {'connectionattempts': '3',
-                      'connecttimeout': '2',
-                      'controlpath': '/tmp/ssh-canoe@starr.richmond.edu:22',
-                      'hostname': 'starr.richmond.edu',
-                      'identityfile': ['/home/canoe/.ssh/id_rsa'],
-                      'port': '22',
-                      'serveraliveinterval': '59',
-                      'user': 'canoe'},
-             'localedir': '/sw/canoe/var/data/test001',
-             'on_error': ERROR_ACTION.skip,
-             'overwrite': True}],
- 'this_dir': '/sw/canoe/var/data/test001'}
-
-    my_packer = URpacker(suffix='canoe')
-    print("attachIO returned {}".format(my_packer.attachIO('f')))
-    print("write returned {}".format(my_packer.write(x)))
-
-    print("attachIO returned {}".format(my_packer.attachIO('f', mode='rb')))
+    f = fname.Fname(sys.argv[1])
+    my_packer = URpacker()
+    print("attachIO returned {}".format(my_packer.attachIO(str(f), mode='rb')))
     y = my_packer.read()
     print("{}".format(y))

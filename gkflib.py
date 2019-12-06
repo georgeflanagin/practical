@@ -7,6 +7,7 @@ import sys
 import argparse
 import atexit
 import base64
+import bs4
 import calendar
 import croniter
 import datetime
@@ -640,6 +641,56 @@ def random_string(length:int=10, all_alpha:bool=True) -> str:
      
     return t[:length]       
         
+
+def scrub(s:str, scrubbing:int=1) -> str:
+    """
+    s - the text shred to scrub.
+
+    scrubbing is a bit mask, with the following meanings:
+        1 - character substitutions for annoying problems found
+            in many texts.
+        2 - Remove SGML type tags.
+        4 - Flatten to UTF-8 to ASCII-7.
+    """
+
+    # If there is no input or we are not scrubbing, bail out.
+    if not len(s) * scrubbing: return s
+
+    subs = [ 
+             (u'\u2014', "---")
+            ,(u'\u2013', "--")
+            ,(u'\u2012', '-')
+            ,(u'\u2010', '-')
+            ,(u'\u2011', '-')
+            ,('[“”"]', "")
+            ,('’', "'")   
+            ,("''", "'")
+            ,('…', '')
+            ,('\r\n', '\n')
+            ,(' & ', ' and ')]
+
+    tombstone("Scrubbing " + str(len(s)) + " chars of input.")
+
+    if scrubbing & 2:
+        tombstone("Removing SGML tags.")
+        s = bs4.BeautifulSoup(s, 'lxml').get_text()
+
+    if scrubbing & 1:
+        for _ in subs:
+            original_len = len(s)
+            s = re.sub(_[0], _[1], s)
+            new_len = len(s)
+            if _ == subs[-1]: continue
+
+    if scrubbing & 4:
+        gkf.tombstone("Flattening to ASCII")
+        s = s.encode('ascii', 'ignore')
+        gkf.tombstone("Smack! Flat ASCII remains.")
+
+    tombstone("Scrubbed text is now " + str(len(s)) + " chars.")
+
+    return s
+
 
 def show_args(pargs:object) -> None:
     """

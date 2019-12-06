@@ -27,6 +27,7 @@ import pandas
 import pprint as pp
 import pwd
 import re
+import resource
 import shlex
 import shutil
 import signal
@@ -60,9 +61,12 @@ RED='\033[31m'
 YELLOW='\033[33m'
 BLUE='\033[34m'
 REVERT='\033[0m'
+REVERSE = "\033[7m"
 
 
 START_TIME = time.time()
+
+class SloppyDict: pass
 
 def blind(s:str) -> str:
     global REVERSE
@@ -204,6 +208,11 @@ def flip_dict(kv_mapping:dict) -> Union[dict, multimap.MutableMultiMap]:
         vk_mapping[str(v)] = k
 
     return vk_mapping
+
+
+available_cpus = len(os.sched_getaffinity(0))
+def fork_ok() -> bool:
+    return os.getloadavg()[0] < available_cpus and memfree() > 0.5
 
 
 def formatted_stack_trace(as_string: bool = False) -> list:
@@ -350,6 +359,22 @@ def make_dir_or_die(dirname:str, mode=None):
         tombstone("{} created. Permissions less than requested.".format(dirname))
 
 
+total_mem = 0
+def memfree() -> float:
+    global total_mem
+    """
+    return the percentage of free memory.
+    """
+    with open('/proc/meminfo') as mf:
+        lines = mf.read().split("\n")
+        avail = int(lines[2].split()[1])
+        try:
+            return avail/total_mem
+        except:
+            total_mem = int(lines[0].split()[1])
+            return avail/total_mem    
+
+
 def mkdir(s:str) -> bool:
     
     try:
@@ -360,6 +385,11 @@ def mkdir(s:str) -> bool:
         return False
 
     return True  
+
+
+def mymem() -> SloppyDict:
+    info = resource.getrusage(resource.RUSAGE_SELF)
+    return SloppyDict({k:getattr(info, k) for k in dir(info) if k.startswith("ru") })
 
 
 def nicely_display(s:str) -> bool:
@@ -623,6 +653,64 @@ def show_args(pargs:object) -> None:
     for _ in sorted(vars(pargs).items()):
         opt_string += " --"+ _[0].replace("_","-") + " " + str(_[1])
     print(opt_string + "\n")    
+
+
+class SloppyDict(dict):
+    """
+    Make a dict into an object for notational convenience.
+    """
+    def __getattr__(self, k:str) -> object:
+        if k in self: return self[k]
+        raise AttributeError("No element named {}".format(k))
+
+    def __setattr__(self, k:str, v:object) -> None:
+        self[k] = v
+
+    def __delattr__(self, k:str) -> None:
+        if k in self: del self[k]
+        else: raise AttributeError("No element named {}".format(k))
+
+    def reorder(self, some_keys:list=[], self_assign:bool=True) -> SloppyDict:
+        new_data = SloppyDict()
+        unmoved_keys = sorted(list(self.keys()))
+
+        for k in some_keys:
+            try:
+                new_data[k] = self[k]
+                unmoved_keys.remove(k)
+            except KeyError as e:
+                pass
+
+        for k in unmoved_keys:
+            new_data[k] = self[k]
+
+        if self_assign: 
+            self = new_data
+            return self
+        else:
+            return copy.deepcopy(new_data)       
+
+    def __str__(self) -> str:
+        return "\n".join([ "{} : {}".format(k, self[k]) for k in self ])
+
+
+def deepsloppy(o:dict) -> Union[SloppyDict, object]:
+    """
+    Multi level slop.
+    """
+    if isinstance(o, dict): 
+        o = SloppyDict(o)
+        for k, v in o.items():
+            o[k] = deepsloppy(v)
+
+    elif isinstance(o, list):
+        for i, _ in enumerate(o):
+            o[i] = deepsloppy(_)
+
+    else:
+        pass
+
+    return o
 
 
 def stalk_and_kill(process_name:str) -> bool:

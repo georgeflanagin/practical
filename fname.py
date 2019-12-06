@@ -36,6 +36,9 @@ __maintainer__ = 'George Flanagin'
 __email__ = 'gflanagin@richmond.edu'
 __status__ = 'Prototype'
 
+
+__license__ = 'MIT'
+
 """
 This is Guido's hack to allow forward references for types not yet
 defined.
@@ -121,16 +124,17 @@ class Fname:
 
     def __call__(self, new_content:str=None) -> Union[bytes, Fname]:
         """
-        Return the contents of the file as an str object.
+        Return the contents of the file as an str-like object, or
+        write new content.
         """
 
-        content = ""
-        if new_content is None:
+        content = b""
+        if bool(self) and new_content is None:
             with open(str(self), 'rb') as f:
                 content = f.read()
         else:
             with open(str(self), 'wb+') as f:
-                f.write(bytes(new_content))
+                f.write(new_content.encode('utf-8'))
             
         return content if new_content is None else self
         
@@ -150,6 +154,10 @@ class Fname:
         str(f) =>> '/home/data/import/big.file.dat'
         """
 
+        return self._fqn
+
+
+    def __fmt__(self) -> str:
         return self._fqn
 
 
@@ -279,6 +287,18 @@ class Fname:
 
 
     @property
+    def empty(self) -> bool:
+        """
+        Check if the file is absent, inaccessible, or short and 
+        containing only whitespace.
+        """
+        try:
+            return len(self) < 3 or not len(f().strip())
+        except:
+            return False 
+
+
+    @property
     def ext(self) -> str:
         """ 
         returns: -- The extension, if any.
@@ -328,7 +348,7 @@ class Fname:
         if len(self._content_hash) > 0: 
             return self._content_hash
 
-        hasher = hashlib.md5()
+        hasher = hashlib.sha1()
 
         with open(str(self), 'rb') as f:
             while True:

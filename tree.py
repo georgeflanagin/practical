@@ -8,14 +8,12 @@ parse and then compile the recipes.
 """
 
 import collections
-import functools
 import json
-import pprint
 
 # Credits
 __author__ = 'George Flanagin'
 __copyright__ = ['Copyright 2015, 2016, 2017, University of Richmond',
-    'Copyright 2017, 2018 George Flanagin'],
+    'Copyright 2017, 2018, 2020 George Flanagin'],
 __credits__ = None
 __version__ = '0.5'
 __license__ = 'https://www.gnu.org/licenses/gpl.html'

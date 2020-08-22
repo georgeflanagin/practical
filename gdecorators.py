@@ -4,7 +4,12 @@ from typing import *
 
 """
 These decorators are designed to handle hard errors in operation
-and provide a stack unwind and dump.
+and provide a stack unwind and dump. The resulting file will be
+named $CANOE_LOG/YYYY-MM-DD/pid. If the same pid dies more than
+once the generator "increment()" will append a letter to the name.
+
+Most of the code during development will have a line that looks
+something like this:
 
 from urdecorators import show_exceptions_and_frames as trap
 # from urdecorators import null_decorator as trap
@@ -16,81 +21,54 @@ preceding it.
 
 # System imports
 import contextlib
+from   functools import wraps
 import inspect
 import os
 import sys
 import types
 
-# Canoe imports
-import gkflib as gkf
+import gtime
+import gpath
+from   tombstone import tombstone
+
 
 # Credits
 __author__ = 'George Flanagin'
-__copyright__ = 'Copyright 2019, George Flanagin'
+__copyright__ = 'Copyright 2015, University of Richmond'
 __credits__ = 'Based on Github Gist 1148066 by diosmosis'
 __version__ = '0.1'
 __maintainer__ = 'George Flanagin'
-__email__ = 'me@georgeflanagin.com'
-__status__ = 'Production'
+__email__ = 'gflanagin@richmond.edu'
+__status__ = 'Prototype'
+__license__ = 'MIT'
 
-def increment(s:str) -> str:
-    return s+'A'
-    
-
-def null_decorator(o:object) -> object:
-    """
-    The big nothing.
-    """
-    return o
-
-
-def show_exceptions(func:object) -> object:
-    """
-    A **simple** decorator function to anticipate errors that might
-    be created by the compilation process.
-    """
-    def func_wrapper(*args, **kwargs):
-        error_message = ""
-        try:
-           return func(*args, **kwargs)
-
-        except Exception as e:
-            gkf.tombstone(error_message)
-            gkf.tombstone(gkf.type_and_text(e))
-            return None
-
-    return func_wrapper
-
-
-
-def show_exceptions_and_frames(func:object) -> None:
+def trap(func:object) -> None:
     """
     An amplified version of the show_exceptions decorator.
     """
 
+    @wraps(func)
     def wrapper(*args, **kwds):
         __wrapper_marker_local__ = None
     
         try:
-            # If you uncomment the next line, you can see a flow trace.
-            # gkf.tombstone(gkf.fcn_signature(func.__name__))
             return func(*args, **kwds)
 
         except Exception as e:
-            print("{}".format(e))
+            print(f"{str(e)}")
             # Who am I?
-            pid = 'pid{}'.format(os.getpid())
+            pid = f'pid{os.getpid()}'
 
             # First order of business: create a dump file. The file will be under
-            # $CANOE_LOG with today's ISO date string as the dir name.
-            new_dir = os.path.join(os.getcwd(), gkf.now_as_string()[:10])
-            gkf.make_dir_or_die(new_dir)
+            # $LOG (if defined) with today's ISO date string as the dir name.
+            new_dir = gpath.path_join(os.environ.get('LOG'), gtime.now_as_string()[:10])
+            uu.make_dir_or_die(new_dir)
 
             # The file name will be the pid (possibly plus something like "A" if this
             # is the second time today this pid has failed).
-            candidate_name = os.path.join(new_dir, pid)
+            candidate_name = uu.path_join(new_dir, pid)
             
-            gkf.tombstone("writing dump to file {}".format(candidate_name))
+            tombstone(f"writing dump to file {candidate_name}")
 
             with open(candidate_name, 'a') as f:
                 with contextlib.redirect_stdout(f):
@@ -98,9 +76,9 @@ def show_exceptions_and_frames(func:object) -> None:
                     try:
                         e_type, e_val, e_trace = sys.exc_info()
                     except Exception as e:
-                        gkf.tombstone(gkf.type_and_text(e))
+                        tombstone(str(e))
 
-                    print('Exception raised {}: "{}"'.format(e_type, e_val))
+                    print(f'Exception raised {e_type}: "{e_val}"')
                     
                     # iterate through the frames in reverse order so we print the
                     # most recent frame first
@@ -125,6 +103,7 @@ def show_exceptions_and_frames(func:object) -> None:
                                 pass
 
                     print('\n')
+            sys.exit(-1)
 
     return wrapper
 

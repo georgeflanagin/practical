@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 
 """ 
-Fname, a portable class for manipulating long, complex, and
+File, a portable class for manipulating long, complex, and
 confusing path and file names on Linux and Windows.
 Experience has taught us that we make a lot of mistakes by placing
 files in the wrong directories, or getting mixed up over extensions.
 In the examples below, we will use the file name:
 
-       f = Fname('/home/data/import/big.file.dat')
+       f = File('/home/data/import/big.file.dat')
 
 This is implemented a portable way, so the same logic will work
 on Windows NTFS for the above path written as:
@@ -38,20 +38,21 @@ __status__ = 'Prototype'
 
 
 __license__ = 'MIT'
+import license
 
 """
 This is Guido's hack to allow forward references for types not yet
 defined.
 """
-class Fname:
+class File:
     pass
 
 @total_ordering
-class Fname:
+class File:
     """ 
     Simple class to make filename manipulation more readable.
     Example:
-        f = Fname('file.ext')
+        f = File('file.ext')
     The resulting object, f, can be tested with if to see if it exists:
         if not f: ...error...
     Additionally, many manipulations of it are available without constant
@@ -66,26 +67,48 @@ class Fname:
 
     def __init__(self, s:str):
         """ 
-        Create an Fname from a string that is a file name or a well
-        behaved URI. An Fname consists of several strings, each of which
+        Create an File from a string that is a file name or a well
+        behaved URI. An File consists of several strings, each of which
         corresponds to one of the commonsense parts of the file name.
-        Members:
-            _me -- whatever you used to create the object.
-            _is_URI -- boolean
-            _fqn -- calculated full name
-            _dir -- just the directory part of the name
-            _fname -- the file and the extension
-            _fname_only -- no dir and no extension
-            _ext -- just the extension (if it has one)
-            _all_but_ext -- the complement of _ext
-            _content_hash -- hexdigit string representing the contents
-                the last time the file was read.
-            _lock_handle -- an entry in the logical unit table.
+
+        Properties:
+
+            f.all_but_ext -- the name, minus any extension.
+            f.busy -- True if we have access but no lock, and we cannot
+                lock the file.
+            f.directory -- the directory part of the name.
+            f.empty -- True even if the file is just white space and no 
+                longer than two bytes.
+            f.ext -- the extension, if any.
+            f.fname -- the file name + extension.
+            f.fname_only -- just the file name.
+            f.fqn -- the whole, exploded name as a string.
+            f.hash -- hash of the contents. Calculates it if the file
+                has not yet been read.
+            f.is_URI -- if the orginal name started with a scheme.
+            f.locked -- True if we have the file locked.
+            
+        Operators and operations:
+
+            f() -- returns the contents of the file.
+            f == g, f < g, etc. -- returns True if the names have this
+                relationship after all paths and env vars are resolved.
+            f @ g -- returns True if the files have the same content. NOTE:
+                the names of the files are irrelevant.
+            bool(f) -- at the time of the function call, does f refer to 
+                an object in the file system that exists and is a file.
+            len(f) -- returns the length of the file.     
+            str(f) -- the fully qualified and resolved name.      
+            f.lock() -- returns True if successful.
+            f.unlock() -- only returns True if you had the file locked
+                before the call. 
+
+
         Raises a ValueError if the argument is empty.
         """
 
         if not s or not isinstance(s, str): 
-            raise ValueError('Cannot create empty Fname object.')
+            raise ValueError('Cannot create empty File object.')
 
         self._me = s
         self._is_URI = False
@@ -112,9 +135,9 @@ class Fname:
 
     def __bool__(self) -> bool:
         """ 
-        returns: -- True if the Fname object is associated with something
+        returns: -- True if the File object is associated with something
         that exists in the file system AT THE TIME THE FUNCTION IS CALLED.
-        Note: this allows one to build the Fname object at a time when "if"
+        Note: this allows one to build the File object at a time when "if"
         would return False, open the file for write, test again, and "if"
         will then return True.
         """
@@ -122,7 +145,7 @@ class Fname:
         return os.path.isfile(self._fqn)
 
 
-    def __call__(self, new_content:str=None) -> Union[bytes, Fname]:
+    def __call__(self, new_content:str=None) -> Union[bytes, File]:
         """
         Return the contents of the file as an str-like object, or
         write new content.
@@ -137,15 +160,15 @@ class Fname:
                 f.write(new_content.encode('utf-8'))
             
         return content if new_content is None else self
-        
 
 
     def __len__(self) -> int:
         """
         returns -- number of bytes in the file
         """
-        if not self: return 0
-        else: return os.stat(str(self)).st_size
+        if not self: 
+            raise OSError(os.EX_USAGE, f"{str(self)} does not exist")
+        return os.stat(str(self)).st_size
 
 
     def __str__(self) -> str:
@@ -167,7 +190,7 @@ class Fname:
         qualified names are equal. 
         """
 
-        if isinstance(other, Fname):
+        if isinstance(other, File):
             return str(self) == str(other)
         elif isinstance(other, str):
             return str(self) == other
@@ -180,7 +203,7 @@ class Fname:
         The less than operation is done with the fully qualified names. 
         """
 
-        if isinstance(other, Fname):
+        if isinstance(other, File):
             return str(self) < str(other)
         elif isinstance(other, str):
             return str(self) < other
@@ -194,7 +217,7 @@ class Fname:
         check to ensure that each is really a file that exists, and
         then check the size before we check the contents.
         """
-        if not isinstance(other, Fname):
+        if not isinstance(other, File):
             return NotImplemented
 
         if not self or not other: return False
@@ -293,7 +316,7 @@ class Fname:
         containing only whitespace.
         """
         try:
-            return len(self) < 3 or not len(f().strip())
+            return len(self) < 3 and not len(f().strip())
         except:
             return False 
 
@@ -352,7 +375,7 @@ class Fname:
 
         with open(str(self), 'rb') as f:
             while True:
-                segment = f.read(Fname.BUFSIZE)
+                segment = f.read(File.BUFSIZE)
                 if not segment: break
                 hasher.update(segment)
         
@@ -438,7 +461,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("You must provide a file name to parse.")
         exit(1)
-    f = Fname(sys.argv[1])
+    f = File(sys.argv[1])
     f.show()
     f()
 else:

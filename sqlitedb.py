@@ -29,102 +29,66 @@ import sqlite3
 import sys
 import time
 
-from os import walk, remove, stat
- 
-import gkflib as gkf
-import fname
+try:
+    import pandas
+    have_pandas = True
+except ImportError as e:
+    have_pandas = False
 
-import sqlite3
+
+from   tombstone import tombstone
+from   gdecorators import trap
 
 class SQLiteDB:
     """
     Basic functions for manipulating all sqlite3 databases. 
-
     If you are building a database, the DDL should be in a global object
     with the name `schema`. This will be used only if the named database
     is not found, or the `force_new_db` parameter to `__init__` is
     True. 
     """
-    def __init__(self, path_to_db:str, 
-                    force_new_db:bool = False, 
-                    local_DDL:list = [],
-                    schema:list = []):
+
+    __slots__ = ( 'stmt', 'OK', 'db', 'cursor', 
+        'timeout', 'isolation_level', 'name', 'use_pandas' )
+    __values__ = ( '', False, None, None,
+        15, 'EXCLUSIVE', '', True)
+    __defaults__ = dict(zip(
+        __slots__, __values__
+        ))
+
+    def __init__(self, path_to_db:str, **kwargs):
         """
-        Does what it says. Opens the database if present, and
-        creates the database if it is MIA.
-
-        path_to_db -- name of the database file. This name may contain environment
-            variables, as well as the Linux/UNIX shortcut names, including 
-            relative paths.
-
-        force_new_db -- will attempt to remove anything at `path_to_db`
-
-        local_DDL -- if present, this parameter can provide additional DDL
-            statements to be executed after schema statements.
-
-        schema -- DLL statements to build the database anew.
+        Does what it says. Opens the database if present.
         """
-        stmt = ""
-        self.OK = True
-        self.db = None
-        self.cursor = None
+        global have_pandas
+        # Set the defaults.
+        for k, v in SQLiteDB.__defaults__.items():
+            setattr(self, k, v)
 
-        db_file = fname.Fname(path_to_db)
-        self.name = str(db_file)
-        gkf.tombstone("Database name is {}".format(self.name))
+        # Make sure it is there.
+        self.name = path_to_db if os.path.isfile(path_to_db) else None
+        if not self.name:
+            tombstone(f"No database named {self.name} found.")
+            return
 
-        error_on_init = False
-        if force_new_db and db_file:
-            try:
-                gkf.tombstone("Attempting to remove old database.")
-                os.remove(self.name)
+        # Give it a tune up if needed.
+        for k, v in kwargs.items(): 
+            if k in SQLiteDB.__slots__:
+                setattr(self, k, v)
 
-            except OSError as e:
-                # no harm in deleting a file that does not exist.
-                gkf.tombstone("Unable to remove old database.")
-
-            else:
-                gkf.tombstone("Removed.")
-
-        if db_file:
-            gkf.tombstone("Attempting to open existing database {}".format(self.name))
-            self.db = sqlite3.connect(self.name, timeout=30, isolation_level='DEFERRED')
-            self.cursor = self.db.cursor()
-            gkf.tombstone("Database opened: {}".format(self.name))
-
-            try:
-                a = [ self.db.execute(stmt) for stmt in gkf.listify(local_DDL) ]
-            except sqlite3.OperationalError as e:
-                gkf.tombstone(gkf.type_and_text(e))
-                self.OK = False
-            finally:
-                return 
-
+        error_on_init = True
         try:
-            gkf.tombstone("Attempting to create database in {}".format(self.name))
-            self.db = sqlite3.connect(self.name, timeout=30, isolation_level='DEFERRED')
-            gkf.tombstone("New database created.")
-
-            try:
-                gkf.tombstone("Executing DDL statements in schema")
-                a = [ self.db.execute(stmt) for stmt in gkf.listify(schema) ]
-            except sqlite3.OperationalError as e:
-                gkf.tombstone(gkf.type_and_text(e))
-                error_on_init = True
+            self.db = sqlite3.connect(self.name, 
+                timeout=self.timeout, isolation_level=self.isolation_level)
+            self.cursor = self.db.cursor()
+            self.keys_on()
+            error_on_init = False
 
         except sqlite3.OperationalError as e:
-            gkf.tombstone(str(e))
-            gkf.tombstone(stmt)
-            exit(os.EX_CANTCREAT)
-
-        else:
-            self.cursor = self.db.cursor()
-            gkf.tombstone('cursor created.')
-
-            self.keys_on()
-            gkf.tombstone('foreign keys are on')
-
+            tombstone(str(e))
+            
         finally:
+            self.use_pandas = have_pandas and self.use_pandas
             self.OK = not error_on_init
 
 
@@ -139,7 +103,6 @@ class SQLiteDB:
         We consider everything "OK" if the object is attached to an open 
         database, and the last operation went well.
         """
-        print(self.OK)
         return self.db is not None and self.OK is True
 
 
@@ -164,22 +127,54 @@ class SQLiteDB:
         self.cursor.execute('pragma synchronous = FULL')
 
 
-    def executeSQL(self, SQL:str) -> object:
+    @trap
+    def commit(self) -> bool:
+        """
+        Expose this function so that it can be called without having
+        to put the dot-notation in the calling code.
+        """
+        try:
+            self.db.commit()
+            return True
+        except:
+            return False
+
+
+    @trap
+    def execute_SQL(self, SQL:str, *args) -> object:
         """
         Wrapper that automagically returns rowsets for SELECTs and 
         number of rows affected for other DML statements.
+        
+        is_select        -- if we think it is a SELECT statement.
+        has_args         -- to avoid the problem with the None-tuple.
+        self.use_pandas  -- iff True, return a DataFrame on SELECT statements.
+
         """        
-        try:
-            if SQL.strip().lower().startswith('select'):
-                rval = self.cursor.execute(SQL).fetchall()
-            else:
-                rval = self.cursor.execute(SQL)
-            self.OK = True
+        is_select = SQL.strip().lower().startswith('select')
+        has_args = not not args
 
-        except Exception as e:
-            gkf.tombstone(gkf.type_and_text(e))
-            self.OK = False
+        if self.use_pandas and is_select:
+            return pandas.read_sql_query(SQL, self.db, *args)
+        
+        if has_args:
+            rval = self.cursor.execute(SQL, args)
+        else:
+            rval = self.cursor.execute(SQL)
 
-        finally:
-            return rval
+        if is_select: return rval.fetchall()
+        self.db.commit()
+        return rval
 
+
+
+    def row_one(self, SQL:str, parameters:Union[tuple, None]=None) -> dict:
+        """
+        Return only the first row of the results. When returned,
+        it will not be a list with one row, but just the row 
+        itself. If the column is provided, then only that column
+        is returned as an atomic datum.
+        """
+       
+        results = self.execute_SQL(SQL, parameters)
+        return None if not results else results[0]

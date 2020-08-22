@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Generic, bare functions, not a part of any object or service. """
+""" Useful functions to manipulate path names and expand env vars. """
 
 # Added for Python 3.5+
 import typing
@@ -12,7 +12,7 @@ from tombstone import tombstone
 
 # Credits
 __author__ = 'George Flanagin'
-__copyright__ = 'Copyright 2020, University of Richmond'
+__copyright__ = 'Copyright 2020'
 __credits__ = None
 __version__ = '0.1'
 __maintainer__ = 'George Flanagin'
@@ -103,7 +103,7 @@ def expandall(s:str) -> str:
     Expand all the user vars into an absolute path name. If the 
     argument happens to be None, it is OK.
     """
-    return s if s is None else os.path.abspath(os.path.expandvars(os.path.expanduser(s)))
+    return "" if s is None else os.path.abspath(os.path.expandvars(os.path.expanduser(s)))
     
 
 ####

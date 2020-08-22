@@ -5,17 +5,12 @@ from typing import *
 """
 These decorators are designed to handle hard errors in operation
 and provide a stack unwind and dump. The resulting file will be
-named $CANOE_LOG/YYYY-MM-DD/pid. If the same pid dies more than
-once the generator "increment()" will append a letter to the name.
+named $LOG/YYYY-MM-DD/pid. 
 
 Most of the code during development will have a line that looks
 something like this:
 
-from urdecorators import show_exceptions_and_frames as trap
-# from urdecorators import null_decorator as trap
-
-In production, we can swap the commented line for the one 
-preceding it. 
+from gdecorators import trap
 
 """
 

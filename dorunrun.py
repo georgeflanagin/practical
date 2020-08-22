@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Generic, bare functions, not a part of any object or service. """
+""" A function to simplify the running of subprocesses. """
 
 import typing
 from   typing import *
@@ -10,7 +10,7 @@ from   tombstone import tombstone
 
 # Credits
 __author__ = 'George Flanagin'
-__copyright__ = 'Copyright 2020, University of Richmond'
+__copyright__ = 'Copyright 2020'
 __credits__ = None
 __version__ = '0.1'
 __maintainer__ = 'George Flanagin'

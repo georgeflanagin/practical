@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Generic, bare functions, not a part of any object or service. """
+""" A few useful time/date functions for logging. """
 
 # Added for Python 3.5+
 import typing

@@ -19,7 +19,7 @@ This class supports all the comparison operators ( ==, !=, <, <=,
 """
 
 
-import  fcntl
+import fcntl
 from   functools import total_ordering
 import hashlib
 import os
@@ -29,7 +29,7 @@ from   urllib.parse import urlparse
 
 # Credits
 __author__ = 'George Flanagin'
-__copyright__ = 'Copyright 2015, University of Richmond'
+__copyright__ = 'Copyright 2015'
 __credits__ = None
 __version__ = '0.6'
 __maintainer__ = 'George Flanagin'

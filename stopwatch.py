@@ -53,7 +53,7 @@ class Stopwatch:
         except:
             self.units = 1000
 
-        self.laps = dict.fromkeys(('start',), time.time())
+        self.laps = dict.fromkeys(['start'], time.time())
 
 
     def start(self) -> float:
@@ -84,8 +84,8 @@ class Stopwatch:
         return self.laps[event]
     
 
-    @propery
-    def laps(self) -> dict:
+    @property
+    def laps_data(self) -> dict:
         return { k : v-self.laps['start'] for k, v in self.laps.items() }
 
 

@@ -38,7 +38,6 @@ __status__ = 'Prototype'
 
 
 __license__ = 'MIT'
-import license
 
 """
 This is Guido's hack to allow forward references for types not yet

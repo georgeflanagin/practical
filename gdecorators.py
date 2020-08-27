@@ -1,17 +1,11 @@
 # -*- coding: utf-8 -*-
 import typing
-from typing import *
+from   typing import *
 
 """
-These decorators are designed to handle hard errors in operation
+This decorator is designed to handle hard errors in operation
 and provide a stack unwind and dump. The resulting file will be
-named $LOG/YYYY-MM-DD/pid. 
-
-Most of the code during development will have a line that looks
-something like this:
-
-from gdecorators import trap
-
+named $LOG/YYYY-MM-DD/pid, and if $LOG is not defined, then $PWD.
 """
 
 # System imports
@@ -59,8 +53,9 @@ def trap(func:object) -> None:
             new_dir = gpath.path_join(os.environ.get('LOG'), gtime.now_as_string()[:10])
             uu.make_dir_or_die(new_dir)
 
-            # The file name will be the pid (possibly plus something like "A" if this
-            # is the second time today this pid has failed).
+            # The file name will be the pid. Note that it is opened in 'a'
+            # mode, so if a previous process with the same pid has crashed,
+            # there will be two dumps in the same file.
             candidate_name = uu.path_join(new_dir, pid)
             
             tombstone(f"writing dump to file {candidate_name}")
@@ -101,4 +96,3 @@ def trap(func:object) -> None:
             sys.exit(-1)
 
     return wrapper
-

@@ -56,13 +56,15 @@ def crontuple_of(t:Any=None) -> datetime.datetime:
 # I
 ###
 
-def iso_time(seconds:int) -> str:
+def iso_time(seconds:int=None) -> str:
+    if seconds is None: seconds = time.time()
     return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(seconds))
 
 
-def iso_seconds(timestring:str) -> int:
-    dt = datetime.datetime.strptime(timestring, '%Y-%m-%dT%H:%M')
-    return dt.strftime("%s")
+def iso_seconds(timestring:str=None) -> int:
+    if timestring is None: timestring = iso_time()
+    dt = datetime.datetime.strptime(timestring, '%Y-%m-%d %H:%M:%S')
+    return int(dt.strftime("%s"))
 
 ###
 # N

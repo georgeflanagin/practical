@@ -102,6 +102,11 @@ here: https://temtum.com/beacon (among other places).
 A few extensions to the ISO and Crontuple expressions of time
 in Python.
 
+### oracleutils
+
+These functions are probably helpful with any database interface
+that is controlled with SQL.
+
 ### slop
 
 This file contains definitions of the `SloppyDict` and the `SloppyTree`

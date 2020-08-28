@@ -68,3 +68,69 @@ Operators and operations:
 ### `gdecorators`
 
 OK, there is only one decorator, but it is a nicely implemented 
+one that shows all the globals and locals at the time it is invoked,
+and does a complete stack unwind to a file.
+
+### `gnet`
+
+A few very simple network related functions that exploit the SSH agent.
+
+### `gpacker`
+
+This class allows you to write and read pickles that have been compressed
+with bzip2, often a very good choice for pickle objects that `pandas.DataFrame`s.
+
+### `gpath`
+
+A few path manipulation utilities that expand environment variables and
+relative path names without a lot of thought required.
+
+### `grandom`
+
+This file has three useful random-ness functions:
+
+- `NISTBeacon2`, a class-object that wraps around the NIST Beacon.
+If you are unfamiliar with this service, you can read about it 
+here: https://temtum.com/beacon (among other places).
+
+- `random_file` creates a random file of a given size.
+
+- `random_string` creates random strings of a given length.
+
+### `gtime`
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

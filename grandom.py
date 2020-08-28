@@ -1,11 +1,22 @@
 # -*- coding: utf-8 -*-
 """  
-A connection to version 2.0 of the NIST Randomness Beacon
+A connection to version 2.0 of the NIST Randomness Beacon, and associated
+random conveniences.
 """
 import typing
 from typing import *
 
+try:
+    import numpy 
+    numpy_installed = True
+except ImportError as e:
+    sys.stderr.write('pcg32 will not be available because numpy is not installed.\n')
+    numpy_installed = False
+
+
+import base64
 import os
+import random
 import sys
 
 import json
@@ -94,6 +105,42 @@ class NISTBeacon2:
     
 
 ####
+# P
+####
+
+if numpy_installed:
+    def pcg32_gen(param1:numpy.uint64=None, param2:numpy.uint64=None) -> numpy.uint32:
+        """
+        All we ever do is call this over and over, so let's make it
+        a generator instead of a class.
+        param1 -- initial state of the engine.
+        param2 -- the increment.
+        yields -- an int, of which 32 bits are suitable scrambled.
+        """
+
+        numpy.seterr(all='ignore') # remove overflow messages.
+
+        if param1 is None: param1 = random.random() * 9223372036854775807
+        if param2 is None: param2 = random.random() * 9223372036854775807
+
+        engine = numpy.array([param1, param2], dtype='uint64')
+        multiplier = numpy.uint64(6364136223846793005)
+        big_1 = numpy.uint32(1)
+        big_18 = numpy.uint32(18)
+        big_27 = numpy.uint32(27)
+        big_59 = numpy.uint32(59)
+        big_31 = numpy.uint32(31)
+
+        while True:
+            old_state = engine[0]
+            inc = engine[1]
+            engine[0] = old_state * multiplier + (inc | big_1)
+            xorshifted = numpy.uint32(((old_state >> big_18) ^ old_state) >> big_27)
+            rot = numpy.uint32(old_state >> big_59)
+            yield numpy.uint32((xorshifted >> rot) | (xorshifted << ((-rot) & big_31)))
+
+
+####
 # R
 ####
 
@@ -112,7 +159,6 @@ def random_file(name_prefix:str, *, length:int=None, break_on:str=None) -> tuple
     num_written = -1
 
     file_size = length if length is not None else random.choice(range(0, 1<<20))
-    fcn_signature('random_string', file_size)
     s = random_string(file_size, True)
 
     if break_on is not None:

@@ -7,6 +7,7 @@ from typing import *
 
 import os
 import paramiko
+import pwd
 import sys
 
 import gpath
@@ -45,3 +46,26 @@ def get_ssh_host_info(host_name:str=None, config_file:str=None) -> List[Dict]:
     if not host_name: return ssh_conf
     if host_name == 'all': return ssh_conf.get_hostnames()
     return None if host_name not in ssh_conf.get_hostnames() else ssh_conf.lookup(host_name)
+
+
+####
+# M
+####
+
+def me() -> tuple:
+    """
+    I am always forgetting just who I am.
+    """
+    my_uid = os.getuid()
+    my_name = pwd.getpwuid(my_uid).pw_name
+    return my_name, my_uid
+
+
+####
+# T
+####
+
+def tobytes(s:str) -> bytes:
+    return bytes(s.encode('utf-8'))
+
+

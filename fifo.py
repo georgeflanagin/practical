@@ -46,7 +46,6 @@ __status__ = 'Working Prototype'
 __required_version__ = (3, 6)
 
 __license__ = 'MIT'
-import license
 
 import os
 import select

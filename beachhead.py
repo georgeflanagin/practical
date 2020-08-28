@@ -13,6 +13,7 @@ __maintainer__ = 'George Flanagin'
 __email__ = 'gflanagin@richmond.edu'
 __status__ = 'Prototype'
 __required_version__ = (3,6)
+__license__ = 'MIT'
 
 # Builtins
 import argparse

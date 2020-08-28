@@ -87,11 +87,17 @@ relative path names without a lot of thought required.
 
 ### grandom
 
-This file has three useful random-ness functions:
+This file has four useful random-ness functions:
 
 - `NISTBeacon2`, a class-object that wraps around the NIST Beacon.
 If you are unfamiliar with this service, you can read about it 
-here: https://temtum.com/beacon (among other places).
+here: https://beacon.nist.gov/home (among other places).
+
+- `pcg32_gen`, a generator that produces fast, high quality
+pseudo-random numbers. If you are really going for speed, you
+probably want Professor Melissa E. O'Neill's version in C. 
+
+See: https://www.pcg-random.org/pdf/hmc-cs-2014-0905.pdf
 
 - `random_file` creates a random file of a given size.
 

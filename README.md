@@ -99,7 +99,15 @@ here: https://temtum.com/beacon (among other places).
 
 ### `gtime`
 
+### `slop`
 
+### `sqlitedb`
+
+### `stopwatch`
+
+### `tombstone`
+
+### `tree`
 
 
 

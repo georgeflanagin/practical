@@ -7,27 +7,27 @@ that I have tended need in my code, regardless of the programming language
 that I have been using at the time. Because I have been using Python for
 the past seven years, it seems logical to code them (again) in Python.
 
-### `beachhead`
+### beachhead
 
 This is the only file not mentioned in the init. This is a standalone
 utility derived from the need to repeatedly test the `paramiko` library
 as new versions come out.
 
-### `devnull`
+### devnull
 
 More of a lark than a utility. This class has a file-like interface, 
 and works like `/dev/null`.
 
-### `dorunrun`
+### dorunrun
 
 A simpler wrapper around `subprocess.run` that allows only one
 way to do things.
 
-### `fifo`
+### fifo
 
 A robust wrapper around kernel pipes for interprocess communication.
 
-### `fname`
+### fname
 
 The interal object, `fname.File`, allows one to have a single object
 that represents both the filename and the file object. From the 
@@ -65,27 +65,27 @@ Operators and operations:
         before the call. 
 ```
 
-### `gdecorators`
+### gdecorators
 
 OK, there is only one decorator, but it is a nicely implemented 
 one that shows all the globals and locals at the time it is invoked,
 and does a complete stack unwind to a file.
 
-### `gnet`
+### gnet
 
 A few very simple network related functions that exploit the SSH agent.
 
-### `gpacker`
+### gpacker
 
 This class allows you to write and read pickles that have been compressed
 with bzip2, often a very good choice for pickle objects that `pandas.DataFrame`s.
 
-### `gpath`
+### gpath
 
 A few path manipulation utilities that expand environment variables and
 relative path names without a lot of thought required.
 
-### `grandom`
+### grandom
 
 This file has three useful random-ness functions:
 
@@ -97,48 +97,32 @@ here: https://temtum.com/beacon (among other places).
 
 - `random_string` creates random strings of a given length.
 
-### `gtime`
+### gtime
 
-### `slop`
+A few extensions to the ISO and Crontuple expressions of time
+in Python.
 
-### `sqlitedb`
+### slop
 
-### `stopwatch`
+This file contains definitions of the `SloppyDict` and the `SloppyTree`
+classes, each of which is derived from `dict`. `SloppyDict` offers the 
+notational convenience of a `class`, and `SloppyTree` adds the automatic
+allocation properties of `collections.defaultdict`.
 
-### `tombstone`
+### sqlitedb
 
-### `tree`
+A class wrapper for your SQLite3 databases.
 
+### stopwatch
 
+A class implementation of an event timer. The `Stopwatch` starts when
+it is constructed. There is a `lap()` function that optionally allows
+you to supply a name for the lap, or it will automatically name them
+for you. When the `stop()` function is called, the times are normalized
+from the start time as offsets. The `Stopwatch` can be set to report 
+in units of time from microseconds to minutes.
 
+### tombstone
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Writes text to `sys.stderr` along with the PID and the time.
 

@@ -5,6 +5,8 @@
 import typing
 from typing import *
 
+from base64 import encodebytes
+
 # Credits
 __author__ = 'George Flanagin'
 __copyright__ = 'Copyright 2020, University of Richmond'

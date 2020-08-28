@@ -1,6 +1,5 @@
 __all__ = (
-    beacon.py
-    ,devnull.py
+    devnull.py
     ,dorunrun.py
     ,fifo.py
     ,fname.py
@@ -8,6 +7,7 @@ __all__ = (
     ,gnet.py
     ,gpacker.py
     ,gpath.py
+    ,grandom.py
     ,gtime.py
     ,slop.py
     ,sqlitedb.py

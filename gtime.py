@@ -24,11 +24,12 @@ __license__ = 'MIT'
 # C
 ###
 
-# Some point in the distant past, namely 14 May 2014
 def crontuple_of(t:Any=None) -> datetime.datetime:
     """
-    Return t (or "now") as a datetime object. t should be in whole 
-    minutes.
+    Return t (or "now") as a datetime object.
+
+    t < 0 means minutes
+    t > 0 means seconds
     """
     global arbitrarily_long_ago
 

@@ -120,7 +120,7 @@ class FIFO:
 
             else:
                 # if it is not a pipe, do not allow this to proceed.
-                raise Exception(f"{self.name} is not a FIFO.")
+                raise Exception(f"{self.name} exists but is not a FIFO.") from None
 
         except FileNotFoundError as e:
             # if it is not present, we cannot create it in write mode.
@@ -128,11 +128,12 @@ class FIFO:
                 raise Exception(
                     f"pipe {self.name} does not exist; it must be created by a reader."
                     ) from None
-            pass
 
         except OSError as e:
             # We were trying to open in write, it is there, but there is no reader.
-            raise Exception(f'{self.name} is not ready because there is no reader.') from None
+            raise Exception(
+                f'{self.name} is not ready because there is no reader.'
+                ) from None
 
         except Exception as e:
             # Something else went wrong. Haven't yet seen this one.

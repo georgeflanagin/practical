@@ -71,6 +71,11 @@ OK, there is only one decorator, but it is a nicely implemented
 one that shows all the globals and locals at the time it is invoked,
 and does a complete stack unwind to a file.
 
+### glinux
+
+Linux shortcuts for people who might not be familiar with the
+OS.
+
 ### gnet
 
 A few very simple network related functions that exploit the SSH agent.

@@ -79,6 +79,7 @@ class NISTBeacon2:
             stdout=subprocess.PIPE
             )
         if result.returncode != 0:
+            tombstone(f"NIST Beacon returned {result.returncode}")
             return None
         
         self.blob = json.loads(result.stdout)
@@ -99,7 +100,7 @@ class NISTBeacon2:
 
     
     @property
-    def msg(self) -> dict:
+    def msg(self) -> tuple:
         return self.blob['pulse']['timeStamp'], self.data
 
     
@@ -144,22 +145,25 @@ if numpy_installed:
 # R
 ####
 
-def random_file(name_prefix:str, *, length:int=None, break_on:str=None) -> tuple:
+def random_file(name_prefix:str=None, *, 
+            name_suffix:str=None,
+            length:int=None, 
+            break_on:str=None) -> tuple:
     """
     Generate a new file, with random contents, consisting of printable
-    characters.
+    characters. This is primarily for testing I/O. 
 
     name_prefix -- In case you want to isolate them later.
     length -- if None, then a random length <= 1MB
     break_on -- For some testing, perhaps you want a file of "lines."
 
-    returns -- a tuple of file_name and size.
+    returns -- a tuple of (file_name, size).
     """    
     f_name = None
     num_written = -1
 
     file_size = length if length is not None else random.choice(range(0, 1<<20))
-    s = random_string(file_size, True)
+    s = random_string(file_size, want_bytes=True)
 
     if break_on is not None:
         if isinstance(break_on, str): break_on = break_on.encode('utf-8')
@@ -169,6 +173,7 @@ def random_file(name_prefix:str, *, length:int=None, break_on:str=None) -> tuple
         f_no, f_name = tempfile.mkstemp(suffix='.txt', prefix=name_prefix)
         num_written = os.write(f_no, s)
         os.close(f_no)
+
     except Exception as e:
         tombstone(str(e))
     
@@ -180,7 +185,6 @@ def random_string(length:int=10, want_bytes:bool=False, all_alpha:bool=True) -> 
     """
     Random data of a given length.
     """
-    
     s = base64.b64encode(os.urandom(length*2))
     if want_bytes: return s[:length]
 

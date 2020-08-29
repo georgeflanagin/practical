@@ -35,13 +35,11 @@ __version__ = '0.6'
 __maintainer__ = 'George Flanagin'
 __email__ = 'gflanagin@richmond.edu'
 __status__ = 'Prototype'
-
-
 __license__ = 'MIT'
 
 """
 This is Guido's hack to allow forward references for types not yet
-defined.
+defined. It is not required in 3.7 and later.
 """
 class File:
     pass
@@ -140,7 +138,6 @@ class File:
         would return False, open the file for write, test again, and "if"
         will then return True.
         """
-
         return os.path.isfile(self._fqn)
 
 
@@ -149,14 +146,19 @@ class File:
         Return the contents of the file as an str-like object, or
         write new content.
         """
-
         content = b""
+        if new_content is not None and not isinstance(new_content, (bytes, str)):
+            raise OSError(os.EX_DATAERR, 
+                "Content to be written is not str-like or bytes-like")
+
         if bool(self) and new_content is None:
             with open(str(self), 'rb') as f:
                 content = f.read()
         else:
-            with open(str(self), 'wb+') as f:
-                f.write(new_content.encode('utf-8'))
+            with open(str(self), 'ab') as f:
+                if isinstance(new_content, str):
+                    new_content.encode('utf-8')
+                f.write(new_content)
             
         return content if new_content is None else self
 
@@ -175,7 +177,6 @@ class File:
         returns: -- The fully qualified name.
         str(f) =>> '/home/data/import/big.file.dat'
         """
-
         return self._fqn
 
 

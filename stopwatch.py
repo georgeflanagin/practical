@@ -4,7 +4,6 @@
 # Added for Python 3.5+
 import typing
 from typing import *
-
 import datetime
 import time
 
@@ -22,9 +21,9 @@ __license__ = 'MIT'
 
 class Stopwatch:
     """
-    Note that the laps are an OrderedDict, so you can name them
+    Note that the laps are a dict, so you can name them
     as you like, and they will still be regurgitated in order
-    later on.
+    later on. Starting with Python 3.6, all dicts are ordered.
     """
     conversions = {
         "minutes":(1/60),

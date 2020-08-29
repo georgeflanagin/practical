@@ -23,6 +23,23 @@ __license__ = 'MIT'
 
 
 ####
+# B
+####
+
+def build_file_list(f:str) -> List[str]:
+    """
+    Resolve all the symbolic names that might be embedded in the filespec,
+    and return a list of all the files that match it **at the time the
+    function is called.**
+
+    f -- a file name "spec."
+
+    returns -- a possibly empty list of file names.
+    """
+    return glob.glob(file_name_filter(f))
+    
+
+####
 # D
 ####
 

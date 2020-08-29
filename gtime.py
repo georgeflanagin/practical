@@ -31,7 +31,6 @@ def crontuple_of(t:Any=None) -> datetime.datetime:
     t < 0 means minutes
     t > 0 means seconds
     """
-    global arbitrarily_long_ago
 
     if t is None:
         moment = datetime.datetime.now()

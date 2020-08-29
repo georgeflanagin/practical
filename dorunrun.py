@@ -29,12 +29,14 @@ def dorunrun(command:Union[str, list],
     command -- a string, or a list of strings, that constitute the
         commonsense definition of the command to be attemped. 
     timeout -- generally, we don't
-    verbose -- do we want some narrative to stderr?
+    verbose -- do we want some narrative to stderr? This call always
+        captures the output, and if verbose is True, then everything
+        captured is written to stderr.
 
     returns -- True if the child process returns a zero.
     """
 
-    if verbose: tombstone(f"original command argument: <{command}>")
+    if verbose: tombstone(f"dorunrun: <{command}>")
 
     if isinstance(command, (list, tuple)):
         command = [str(_) for _ in command]
@@ -46,7 +48,6 @@ def dorunrun(command:Union[str, list],
     else:
         raise Exception(f"Bad argument type to run: {command}")
 
-    if verbose: tombstone(f"shlex-ed command argument: <{command}>")
     r = None
 
     try:

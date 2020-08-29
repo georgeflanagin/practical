@@ -62,7 +62,7 @@ class DevNull:
 
     # We don't need an open method, but a close is required.
     # open() is a file factory in Python 3.
-    def close(self) -> bool:
+    def close(self) -> None:
         """
         Close always succeeds.
         """
@@ -76,6 +76,7 @@ class DevNull:
 
     def flush(self) -> None:
         pass
+
 
     def write(self, datum) -> int:
         """

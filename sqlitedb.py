@@ -172,8 +172,7 @@ class SQLiteDB:
         """
         Return only the first row of the results. When returned,
         it will not be a list with one row, but just the row 
-        itself. If the column is provided, then only that column
-        is returned as an atomic datum.
+        itself. 
         """
        
         results = self.execute_SQL(SQL, parameters)

@@ -4,6 +4,7 @@ __all__ = (
     ,'fifo'
     ,'fname'
     ,'gdecorators'
+    ,'glinux'
     ,'gnet'
     ,'gpacker'
     ,'gpath'

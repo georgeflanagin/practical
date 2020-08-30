@@ -64,6 +64,6 @@ def parse_proc(pid:int=None) -> dict:
         else:
             continue
         if k in interesting_keys:
-            kv[k.lower()[2:]] = int(v.split()[0])
+            kv[k.lower()[2:]] = int(v.split()[0]) << 10
 
     return kv

@@ -146,7 +146,6 @@ if numpy_installed:
 ####
 
 def random_file(name_prefix:str=None, *, 
-            name_suffix:str=None,
             length:int=None, 
             break_on:str=None) -> tuple:
     """

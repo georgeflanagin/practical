@@ -5,6 +5,7 @@
 import typing
 from typing import *
 
+import fnmatch
 import os
 import sys
 
@@ -21,6 +22,29 @@ __status__ = 'Prototype'
 
 __license__ = 'MIT'
 
+
+###
+# A
+###
+
+def all_files_in(s:str) -> str:
+    """
+    A generator to cough up the full file names for every
+    file in a directory.
+    """
+    s = expandall(s)
+    for c, d, files in os.walk(s):
+        for f in files:
+            yield os.path.join(c, f)
+
+
+def all_files_like(s:str) -> str:
+    """
+    Returns a list of all files that match the argument
+    """
+    s = expandall(s)
+    return [ f for f in all_files_in(os.path.dirname(s))
+        if fnmatch.fnmatch(os.path.basename(f), os.path.basename(s)) ]
 
 ####
 # B

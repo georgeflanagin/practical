@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Beachhead is a program that allows interactive operation of
@@ -15,281 +15,42 @@ __status__ = 'Prototype'
 __required_version__ = (3,6)
 __license__ = 'MIT'
 
-# Builtins
-import argparse
-import cmd
-import logging
+# Universal imports
 import os
-import socket
-import subprocess
 import sys
-import time
 import typing
 from   typing import *
 
-# Paramiko
-import logging
-import paramiko 
-from   paramiko import SSHClient, SSHConfig, SSHException
-
-import fname
-import gnet
-from   tombstone import tombstone
-
+# Check
 if sys.version_info < __required_version__:
     tombstone('This program requires Python {} or greater.'.format(__required_version__))
     sys.exit(os.EX_SOFTWARE)
 
-class SocketConnection:
+# Builtins
+import argparse
+import cmd
+import logging
+import socket
 
-    """
-    __slots__ = [
-        'my_host', 'user', 'remote_host', 'remote_port',
-        'ssh_info', 'auth_timeout', 'banner_timeout',' tcp_timeout',
-        'sock_type', 'sock_domain', 'password', 'sock',
-        'sock_transport', 'channel', 'client', 'sftp',
-        'error'
-        ]
-    """
+# Installables.
 
-    def __init__(self):
-        # Identification members
-        self.my_host = socket.getfqdn().replace('-','.')
-        self.user = gnet.me()
-        self.remote_host = ""
-        self.remote_port = 0
-        self.ssh_info = None
+try:
+    # Paramiko
+    import paramiko 
+except ImportError as e:
+    sys.stderr.write('This program requires paramiko.')
+else:
+    from paramiko import SSHClient, SSHConfig, SSHException
 
-        # Performance parameters.
-        self.auth_timeout = 1.0
-        self.banner_timeout = 1.0
-        self.tcp_timeout = 1.0
+# From this library.
 
-        # Socket types
-        self.sock_type = socket.SOCK_STREAM
-        self.sock_domain = socket.AF_INET
-
-        # Connection parameters.
-        self.password = None
-        self.sock = None
-        self.transport = None
-        self.channel = None
-        self.client = None
-        self.sftp = None
-
-        # Most recent error.
-        self.error = None
-        logging.getLogger("paramiko").setLevel(logging.CRITICAL)
-        paramiko.util.log_to_file("beachhead.log")
-
-
-    
-    def __bool__(self) -> bool: 
-        return self.error is None and self.sock is not None
-
-
-    def __str__(self) -> str:
-        description = []
-        description.append( "no connection" if not self.sock else "{}:{} {}".format(
-            self.remote_host, self.remote_port, self.error_msg()))
-        for slot in SocketConnection.__slots__:
-            description.append("{} = {}".format(slot, getattr(self, slot)))
-        return "\n".join(description)
-
-
-    def block(self) -> None:
-        self.sock.settimeout(None)
-
-
-    def blocking(self) -> bool:
-        return self.sock.getblocking()
-
-
-    def unblock(self) -> None:
-        self.sock.settimeout(0.0)
-
-
-    def close(self) -> None:
-        if self.sftp: self.sftp.close(); self.sftp = None
-        if self.channel: self.channel.close(); self.channel = None
-        if self.transport: self.transport.close(); self.transport = None
-        if self.client: self.client.close(); self.client = None
-        if self.sock: self.sock.close(); self.sock = None
-
-
-    def debug_level(self, level:int=None) -> int:
-        """
-        Manipulate the logging level.
-        """
-
-        if level is None:
-            return logging.getLogger('paramiko').getEffectiveLevel()      
-        else:
-            logging.getLogger('paramiko').setLevel(level)
-            return self.debug_level()  
-
-
-    def error_msg(self) -> str:
-        return str(self.error)
-
-
-    def open_channel(self, channel_type:str="session") -> bool:
-        """
-        Acquire a channel of the desired type. "session" is the default.
-        """
-        self.error = None
-        channel_types = {
-            "session":"session", "forward":"forwarded-tcpip", "direct":"direct-tcpip", "x":"x11"
-            }
-
-        if data not in channel_types.keys() and data not in channel_types.values():
-            self.error = 'unknown channel type: {}'.format(data)
-            return False
-
-        try:
-            self.channel = self.transport.open_channel(data)
-        except Exception as e:
-            self.error = str(e)
-        finally:
-            return self.error is not None
-
-
-    def open_session(self) -> bool:
-        """
-        Attempt to create an SSH session with the remote host using
-        the socket, transport, and channel that we [may] have already
-        openend.
-        """
-        self.error = None
-        self.client = SSHClient()
-        self.client.load_system_host_keys()
-        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
-
-        try:
-            if not self.password:
-                self.client.connect(self.ssh_info['hostname'],
-                    int(self.ssh_info['port']),
-                    username=self.ssh_info['user'],
-                    key_filename=self.ssh_info['identityfile'],
-                    sock=self.sock)        
-
-            else:
-                self.client.connect(self.ssh_info['hostname'], 
-                    int(self.ssh_info['port']), 
-                    username=self.ssh_info['user'], 
-                    password=self.password,
-                    sock=self.sock)
-
-        except paramiko.ssh_exception.BadAuthenticationType as e:
-            self.error = str(e)
-
-        except Exception as e:
-            self.error = str(e)
-
-        finally:
-            return self.error is None
-
-
-    def open_sftp(self, data:list=[]) -> bool:
-        """
-        Open an sftp connection to the remote host.
-        """
-        self.error = None
-        try:
-            self.sftp = paramiko.SFTPClient.from_transport(self.transport)
-
-        except Exception as e:
-            self.error = str(e)
-
-        finally:
-            return self.error is None
-
-
-    def open_socket(self, host:str, port:int=None) -> bool:
-        """
-        Attemps to open a new socket with the current parameters.
-        """
-        self.error = None
-        self.ssh_info = gnet.get_ssh_host_info(host)
-        if not self.ssh_info: 
-            self.error = 'unknown host'
-            return False
-
-        hostname = self.ssh_info['hostname'] 
-        try:
-            port = int(port)
-        except:
-            port = int(self.ssh_info['port'])
-
-        self.sock = socket.socket(self.sock_domain, self.sock_type)
-        try:
-            self.sock.settimeout(self.tcp_timeout)
-            self.sock.connect((hostname,port))
-        except socket.timeout as e:
-            self.error = 'timeout of {} seconds exceeded.'.format(self.tcp_timeout)
-        except Exception as e:
-            self.error = str(e)
-        else:
-            self.remote_host = hostname
-            self.remote_port = port
-        
-        return self.error is None
-
-
-    def open_transport(self, data:str="") -> bool:
-        """
-        Creates a transport layer from an open/active ssh session.
-        """
-        self.error = None
-        if not self.client:
-            self.error = 'no open session for transport'
-            return False
-
-        try:
-            self.transport = self.client.get_transport()
-
-        except Exception as e:
-            self.error = str(e)
-
-        finally:
-            return self.error is None
-
-
-    def read(self, buffsize:int=4096) -> str:
-        """
-        Read from the socket. 
-
-        buffsize -- read chunks in this size.
-        """
-        message = None
-        try:
-            message = self.sock.recv(buffsize)
-        except KeyboardInterrupt as e:
-            print('Tired of waiting, eh?')
-        except Exception as e:
-            tombstone(str(e))
-            
-        return '' if message is None else message.decode('utf-8')
-            
-
-            
-    def send(self, message:str='') -> int:
-        """
-        write the message to the socket.
-    
-        message -- can be bytes or str; always converted to bytes.
-
-        returns -- number of bytes read.
-        """
-        if isinstance(message, str):
-            messsage = gnet.tobytes(message)
-        result = self.sock.sendall(message)
-        return result
-
-    
-    def timeouts(self) -> tuple:
-        return self.tcp_timeout, self.auth_timeout, self.banner_timeout
-
+from   dorunrun import dorunrun
+import fname
+import gnet
+import socketconnection
+from   socketconnection import SocketConnection
+from   stopwatch import Stopwatch
+from   tombstone import tombstone
 
 ########################################################
 
@@ -320,7 +81,7 @@ class Beachhead(cmd.Cmd):
         
         cmd.Cmd.__init__(self)
         Beachhead.prompt = "\n[beachhead]: "
-        self.hop = SocketConnection()
+        self.conn = SocketConnection()
 
     
     def __bool__(self) -> bool: 
@@ -328,7 +89,7 @@ class Beachhead(cmd.Cmd):
 
 
     def __str__(self) -> str:
-        return "{}:{}".format(self.hop.remote_host, self.hop.remote_port)
+        return "{}:{}".format(self.conn.remote_host, self.conn.remote_port)
 
 
     def preloop(self) -> None:
@@ -348,7 +109,7 @@ class Beachhead(cmd.Cmd):
         """
         Close the open socket connection (if any)
         """
-        if self.hop: self.hop.close()
+        if self.conn: self.conn.close()
         else: tombstone('nothing to do')
 
 
@@ -370,16 +131,9 @@ class Beachhead(cmd.Cmd):
 
         """
         if not len(data):
-            tombstone(blue('debug level is {}'.format(self.hop.debug_level())))
+            tombstone(blue('debug level is {}'.format(self.conn.debug_level())))
             return
 
-        logging_levels = {
-            "CRITICAL":"50",
-            "ERROR":"40",
-            "WARNING":"30",
-            "INFO":"20",
-            "DEBUG":"10",
-            "NOTSET":"0" }
 
         data = data.strip().upper()
         if data not in logging_levels.keys() and data not in logging_levels.values():
@@ -391,7 +145,7 @@ class Beachhead(cmd.Cmd):
         except:
             level = int(logging_levels[data])
         finally:
-            self.hop.debug_level(level)
+            self.conn.debug_level(level)
             
 
 
@@ -407,7 +161,7 @@ class Beachhead(cmd.Cmd):
 
         try:
             tombstone('attempting remote command {}'.format(data))
-            in_, out_, err_ = self.hop.channel.exec_command(data)
+            in_, out_, err_ = self.conn.channel.exec_command(data)
 
         except KeyboardInterrupt as e:
             tombstone('aborting. Control-C pressed.')
@@ -420,7 +174,7 @@ class Beachhead(cmd.Cmd):
             tombstone(out_.readlines())
 
         finally:
-            self.hop.open_channel()
+            self.conn.open_channel()
 
 
     def do_error(self, data:str="") -> None:
@@ -429,8 +183,8 @@ class Beachhead(cmd.Cmd):
 
         [re]displays the error of the connection, and optionally resets it
         """
-        tombstone(self.hop.error)
-        if 'reset'.startswith(data.strip().lower()): self.hop.error = None
+        tombstone(self.conn.error)
+        if 'reset'.startswith(data.strip().lower()): self.conn.error = None
 
 
     def do_exit(self, data:str="") -> None:
@@ -449,13 +203,14 @@ class Beachhead(cmd.Cmd):
         using the Python 3 library named `paramiko`. To make (or attempt to
         make) a connection to a remote host, the following is recommended:
 
-        hosts  <- This will give a list of "known hosts"
-        open socket host port  <- Specify your target, and create a connection.
-        set password AbraCadabra <- Only if you need it; keys don't require
-            a password.
-        open session <- Using the info from ~/.ssh/config
-        open transport <- You will need this if you intend to do anything
-            beyond sitting at your desk admiring what you have done so far.
+        hosts                       <- This will give a list of "known hosts"
+        open socket host port       <- Specify your target, and create a connection.
+        set password AbraCadabra    <- Only if you need it; keys don't require
+                                        a password.
+        open session                <- Using the info from ~/.ssh/config
+        open transport              <- You will need this if you intend to do anything
+                                        beyond sitting at your desk admiring what 
+                                        you have done so far.
         
         Now, if you want to execute a command on the remote host, you will need
         a channel. If you want to transfer a file (something we do a lot of), you
@@ -463,6 +218,7 @@ class Beachhead(cmd.Cmd):
 
         open channel 
         open sftp
+
         """
         print(self.do_general.__doc__)
 
@@ -471,15 +227,15 @@ class Beachhead(cmd.Cmd):
         """
         get a file from the remote host.
         """
-        if not self.hop.sftp:
+        if not self.conn.sftp:
             tombstone('sftp channel is not open.')
             return
 
         start_time = time.time()
-        OK = self.hop.sftp.get(data, Fname(data).fname())
+        OK = self.conn.sftp.get(data, Fname(data).fname())
         stop_time = time.time()
         if OK: tombstone('success')
-        else: tombstone('failure ' + self.hop.error_msg())
+        else: tombstone('failure ' + self.conn.error_msg())
         tombstone('elapsed time: ' + elapsed_time(stop_time, start_time))
 
 
@@ -521,7 +277,7 @@ class Beachhead(cmd.Cmd):
         """
         send a file to the remote host.
         """
-        if not self.hop.sftp:
+        if not self.conn.sftp:
             tombstone('sftp channel is not open.')
             return
 
@@ -537,12 +293,12 @@ class Beachhead(cmd.Cmd):
         start_time = time.time()
         OK = None
         try:
-            OK = self.hop.sftp.put(str(f), f.fname())
+            OK = self.conn.sftp.put(str(f), f.fname())
         except Exception as e:
             tombstone(str(e))
         stop_time = time.time()
         if OK: tombstone('success')
-        else: tombstone('failure ' + self.hop.error_msg())
+        else: tombstone('failure ' + self.conn.error_msg())
         tombstone('elapsed time: ' + elapsed_time(stop_time, start_time))
 
 
@@ -551,7 +307,7 @@ class Beachhead(cmd.Cmd):
         quit:
             close up everything gracefully, and then exit.
         """
-        self.hop.sock.close()
+        self.conn.sock.close()
         os.closerange(3,1024)
         self.do_exit(data)
 
@@ -564,7 +320,7 @@ class Beachhead(cmd.Cmd):
         """
         message = None
         try:
-            message = self.hop.sock.read()
+            message = self.conn.sock.read()
         except Exception as e:
             tombstone(str(e))
             tombstone('socket not readable.')
@@ -585,7 +341,7 @@ class Beachhead(cmd.Cmd):
 
         Sends stuff over the channel.
         """
-        if not self.hop.channel: 
+        if not self.conn.channel: 
             tombstone('channel not open.')
             self.do_help('send')
             return
@@ -599,7 +355,7 @@ class Beachhead(cmd.Cmd):
                 tombstone(str(e))
             
         try:
-            i = self.hop.channel.send(data)
+            i = self.conn.channel.send(data)
             tombstone('sent {} bytes.'.format(i))
 
         except KeyboardInterrupt:
@@ -609,7 +365,7 @@ class Beachhead(cmd.Cmd):
             tombstone(str(e))
             
         finally:
-            self.hop.open_channel()
+            self.conn.open_channel()
 
 
     def do_write(self, msg:str="") -> int:
@@ -623,7 +379,7 @@ class Beachhead(cmd.Cmd):
         try:
             if not isinstance(msg, bytes):
                 msg = gnet.tobytes(msg)
-            i = self.hop.sock.send(msg)
+            i = self.conn.sock.send(msg)
         except Exception as e:
             tombstone(str(e))
         else:    
@@ -638,9 +394,9 @@ class Beachhead(cmd.Cmd):
         """
         data = data.strip()
 
-        if data.lower() == 'none': self.hop.password = None
-        elif not data: tombstone('password is set to {}'.format(self.hop.password))
-        else: self.hop.password = data        
+        if data.lower() == 'none': self.conn.password = None
+        elif not data: tombstone('password is set to {}'.format(self.conn.password))
+        else: self.conn.password = data        
 
 
     def do_setsockdomain(self, data:str="") -> None:
@@ -651,11 +407,11 @@ class Beachhead(cmd.Cmd):
             af_unix -- a socket on local host that most people call a 'pipe'
         """
 
-        if not data: tombstone('socket domain is {}'.format(self.hop.sock_domain)); return
+        if not data: tombstone('socket domain is {}'.format(self.conn.sock_domain)); return
         data = data.strip().lower()
 
-        if data == 'af_inet': self.hop.sock_domain = socket.AF_INET
-        elif data == 'af_unix': self.hop.sock_domain = socket.AF_UNIX
+        if data == 'af_inet': self.conn.sock_domain = socket.AF_INET
+        elif data == 'af_unix': self.conn.sock_domain = socket.AF_UNIX
         else: tombstone('unknown socket domain: {}'.format(data))
 
 
@@ -668,10 +424,10 @@ class Beachhead(cmd.Cmd):
             raw    -- bare metal 
         """
         sock_types = {'stream':socket.SOCK_STREAM, 'dgram':socket.SOCK_DGRAM, 'raw':socket.SOCK_RAW }
-        if not data: tombstone('socket type is {}'.format(self.hop.sock_type)); return
+        if not data: tombstone('socket type is {}'.format(self.conn.sock_type)); return
 
         try:
-            self.hop.sock_type = sock_types[data.strip().lower()]                
+            self.conn.sock_type = sock_types[data.strip().lower()]                
 
         except:
             tombstone('unknown socket type: {}'.format(data))
@@ -686,7 +442,7 @@ class Beachhead(cmd.Cmd):
         """
         if not data: 
             tombstone('timeouts (tcp, auth, banner): ({}, {}, {})'.format(
-                self.hop.tcp_timeout, self.hop.auth_timeout, self.hop.banner_timeout))
+                self.conn.tcp_timeout, self.conn.auth_timeout, self.conn.banner_timeout))
             return
 
         data = data.strip().split()
@@ -696,7 +452,7 @@ class Beachhead(cmd.Cmd):
             return
 
         try:
-            setattr(self.hop, data[0]+'_timeout', float(data[1]))
+            setattr(self.conn, data[0]+'_timeout', float(data[1]))
         except AttributeError as e:
             tombstone('no timeout value for ' + data[0])
         except ValueError as e:
@@ -711,16 +467,16 @@ class Beachhead(cmd.Cmd):
 
             displays the current state of the connection.
         """
-        tombstone("debug level: {}".format(self.hop.debug_level()))
-        if not self.hop.sock: tombstone('not connected.'); return
+        tombstone("debug level: {}".format(self.conn.debug_level()))
+        if not self.conn.sock: tombstone('not connected.'); return
 
-        tombstone("local end:   {}".format(self.hop.sock.getsockname()))
-        tombstone("remote end:  {}".format(self.hop.sock.getpeername()))
-        tombstone("type/domain: {} / {}".format(self.hop.sock_type, self.hop.sock_domain))
-        tombstone("ssh session: {}".format(self.hop.client))
-        tombstone("transport:   {}".format(self.hop.transport))
-        tombstone("sftp layer:  {}".format(self.hop.sftp))
-        tombstone("channel:     {}".format(self.hop.channel))
+        tombstone("local end:   {}".format(self.conn.sock.getsockname()))
+        tombstone("remote end:  {}".format(self.conn.sock.getpeername()))
+        tombstone("type/domain: {} / {}".format(self.conn.sock_type, self.conn.sock_domain))
+        tombstone("ssh session: {}".format(self.conn.client))
+        tombstone("transport:   {}".format(self.conn.transport))
+        tombstone("sftp layer:  {}".format(self.conn.sftp))
+        tombstone("channel:     {}".format(self.conn.channel))
 
 
     def do_version(self, data:str="") -> None:
@@ -754,11 +510,11 @@ class Beachhead(cmd.Cmd):
         tombstone('attempting to create a channel of type {}'.format(data))
 
         start_time = time.time()
-        OK = self.hop.transport.open_channel(data)
+        OK = self.conn.transport.open_channel(data)
         stop_time = time.time()
 
         if OK: tombstone('success')
-        else: tombstone('failed ' + self.hop.error_msg())
+        else: tombstone('failed ' + self.conn.error_msg())
 
         tombstone('elapsed time: {}'.format(elapsed_time(start_time, stop_time)))
 
@@ -771,16 +527,16 @@ class Beachhead(cmd.Cmd):
             the socket, transport, and channel that we [may] have already
             openend.
         """
-        self.hop.client = SSHClient()
-        self.hop.client.load_system_host_keys()
-        self.hop.client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
+        self.conn.client = SSHClient()
+        self.conn.client.load_system_host_keys()
+        self.conn.client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
     
         start_time = time.time()
-        OK = self.hop.open_session()
+        OK = self.conn.open_session()
         stop_time = time.time()
 
         if OK: tombstone('ssh session established.')
-        else: tombstone('failed '+self.hop.error_msg())
+        else: tombstone('failed '+self.conn.error_msg())
 
         tombstone('elapsed time: {}'.format(elapsed_time(start_time, stop_time)))
 
@@ -789,17 +545,17 @@ class Beachhead(cmd.Cmd):
         """
         Open an sftp connection to the remote host.
         """
-        if not self.hop.transport:
+        if not self.conn.transport:
             tombstone('Transport layer is not open. You must create it first.')
             return
 
         tombstone('creating sftp client.')
         start_time = time.time()
-        OK = self.hop.open_sftp()
+        OK = self.conn.open_sftp()
         stop_time = time.time()
 
         if OK: tombstone('success')
-        else: tombstone('failure '+self.hop.error_msg())
+        else: tombstone('failure '+self.conn.error_msg())
 
         tombstone('elapsed time: {}'.format(elapsed_time(start_time, stop_time)))
             
@@ -817,10 +573,10 @@ class Beachhead(cmd.Cmd):
             data.append(None)
 
         start_time = time.time()
-        OK = self.hop.open_socket(data[0], data[1])
+        OK = self.conn.open_socket(data[0], data[1])
         stop_time = time.time()
         if OK: tombstone('connected.')
-        else: tombstone(self.hop.error_msg())          
+        else: tombstone(self.conn.error_msg())          
         
         tombstone('elapsed time: {}'.format(elapsed_time(start_time, stop_time)))
 
@@ -829,22 +585,22 @@ class Beachhead(cmd.Cmd):
         """
         Creates a transport layer from an open/active ssh session.
         """
-        if not self.hop.client:
+        if not self.conn.client:
             tombstone('You must create an ssh session before you can create a transport layer atop it.')
             return
 
         tombstone('attempting to create a transport layer')
         start_time = time.time()
-        OK = self.hop.open_transport()
+        OK = self.conn.open_transport()
         stop_time = time.time()
         if OK: tombstone('success')
-        else: tombstone('failed '+self.hop.error_msg())
+        else: tombstone('failed '+self.conn.error_msg())
         tombstone('elapsed time: {}'.format(elapsed_time(start_time, stop_time)))
         
 
 if __name__ == "__main__":
 
-    subprocess.call('clear',shell=True)
+    dorunrun('clear',shell=True)
     while True:
         try:
             Beachhead().cmdloop()

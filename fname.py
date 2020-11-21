@@ -368,7 +368,7 @@ class File:
         Return the hash if it has already been calculated, otherwise
         calculate it and then return it. 
         """
-        if len(self._content_hash) > 0: 
+        if self._content_hash: 
             return self._content_hash
 
         hasher = hashlib.sha1()
